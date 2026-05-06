@@ -1,0 +1,7 @@
+interface:
+  display_name: "IoTDB SQL Testcase Pipeline"
+  short_description: "IoTDB SQL case automation flow"
+  default_prompt: "Use $iotdb-sql-testcase-pipeline to turn this IoTDB/TimechoDB requirement and docs into detailed cases, automation files, remote execution, and a fixed report."
+
+policy:
+  allow_implicit_invocation: true
