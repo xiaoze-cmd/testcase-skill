@@ -1,13 +1,13 @@
 ---
 name: iotdb-sql-testcase-pipeline
-description: Use when Codex needs to turn IoTDB/TimechoDB SQL requirements into detailed Markdown cases and .run files, or operate 1C1D/3C3D SQL-test environments from provided IoTDB and sql-test directories, including tree/table config, rpc_address/iotdbURL sync, setup/test runs, restarts, artifact collection, reports, or screenshots.
+description: Use when Codex needs to turn IoTDB/TimechoDB SQL requirements into detailed Markdown cases and .run files, or operate 1C1D/3C3D SQL-test environments from provided IoTDB and sql-test directories, including tree/table config, rpc_address/iotdbURL sync, special_query.csv result masking, setup/test runs, restarts, artifact collection, reports, or screenshots.
 ---
 
 # IoTDB SQL Testcase Pipeline
 
 ## Overview
 
-Use this skill to run the end-to-end IoTDB/TimechoDB SQL testcase workflow in a reusable way: requirement analysis, detailed Markdown cases, automatic `.run` generation, remote deployment, 1C1D/3C3D cluster handling, tree/table model configuration, setup/test execution, artifact pullback, and fixed-format reporting.
+Use this skill to run the end-to-end IoTDB/TimechoDB SQL testcase workflow in a reusable way: requirement analysis, detailed Markdown cases, automatic `.run` generation, SQL-test result-column masking, remote deployment, 1C1D/3C3D cluster handling, tree/table model configuration, setup/test execution, artifact pullback, and fixed-format reporting.
 
 Always prefer the current repository's `AGENTS.md` if present. It is the project memory and may override stale details in this skill. Never store SSH passwords, tokens, or private key material in generated files.
 
@@ -39,14 +39,15 @@ Always prefer the current repository's `AGENTS.md` if present. It is the project
 8. Configure SQL-test for the target model:
    - Table model uses `jdbc:iotdb://<rpc_address>:6667?version=V_1_0&sql_dialect=table`.
    - Tree model uses exactly `jdbc:iotdb://<rpc_address>:6667`; remove `?version=...` and any other query parameters.
-9. Deploy automation artifacts to the target SQL-test directory using SSH key authentication or an existing secure runtime configuration.
-10. Execute the two-phase automation flow when the user asks for full execution:
+9. Configure `user/CONFIG/special_query.csv` before setup mode when generated cases contain known volatile result columns such as time, query IDs, elapsed time, region IDs, build info, usage, or other environment-dependent columns. Back up the CSV first, then add `SQL;ColumnName;ColumnName` entries that exactly match the query text used in `.run`.
+10. Deploy automation artifacts to the target SQL-test directory using SSH key authentication or an existing secure runtime configuration.
+11. Execute the two-phase automation flow when the user asks for full execution:
    - Set SQL-test mode to `setup`, execute, and collect `.result` artifacts.
    - Stop IoTDB on the supplied `1C1D` host or supplied `3C3D` cluster access host.
    - Clean only the verified IoTDB `data/` and `logs/` directories.
    - Restart IoTDB, re-check RPC port `6667`, set SQL-test mode to `test`, execute again, and collect `.out`, `result.xml`, and logs.
-11. Pull back `.result`, `.out`, `result.xml`, logs, wrapper output, and any exported data summaries needed for validation.
-12. Fill `execution-report.md` using the fixed template. Include only metrics, paths, conclusion, failure rows, notes, and screenshots/evidence images.
+12. Pull back `.result`, `.out`, `result.xml`, logs, wrapper output, `special_query.csv`, and any exported data summaries needed for validation.
+13. Fill `execution-report.md` using the fixed template. Include only metrics, paths, conclusion, failure rows, notes, and screenshots/evidence images.
 
 ## Remote Defaults
 
@@ -73,6 +74,8 @@ Treat these as defaults, not facts. Verify active paths and configs on the remot
 - For tree model cases, do not use `use`; use full paths such as `root.test.d1.s1`.
 - For SQL-test config, table and tree model are different. Table mode must use `sql_dialect=table`; tree mode must remove everything after port `6667` from `iotdbURL`.
 - Keep DataNode `dn_rpc_address` and SQL-test `iotdbURL` synchronized. The RPC port is fixed to `6667`; SQL-test should connect to `jdbc:iotdb://<dn_rpc_address>:6667...` for table mode and exactly `jdbc:iotdb://<dn_rpc_address>:6667` for tree mode.
+- Use `special_query.csv` for column-level result masking when only some output columns are unstable. Do not replace a deterministic query with `<<CHECKCODE;` just to hide one volatile column.
+- Update `special_query.csv` before setup mode so `.result` and `.out` are generated with the same masked columns. If masking is discovered after a mismatch, update the CSV and rerun the full setup -> clean/restart -> test sequence.
 - For performance cases, include data volume, concurrency or loop count, warm-up behavior, measured metric, threshold/baseline rule, cleanup policy, and remote output path.
 
 ## Final Response Shape

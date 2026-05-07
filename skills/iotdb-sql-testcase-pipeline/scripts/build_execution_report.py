@@ -25,6 +25,7 @@ def main() -> int:
     parser.add_argument("--iotdb-dir", default="", dest="iotdb_dir")
     parser.add_argument("--sql-test-dir", default="", dest="sql_test_dir")
     parser.add_argument("--rpc-endpoint", default="", dest="rpc_endpoint")
+    parser.add_argument("--special-query", default="", dest="special_query")
     parser.add_argument("--execution-mode", default="", dest="execution_mode")
     parser.add_argument("--script", required=True)
     parser.add_argument("--remote-command", default="")
@@ -62,6 +63,7 @@ def main() -> int:
 | IoTDB 安装目录 | `{args.iotdb_dir or '无'}` |
 | SQL-test 工具目录 | `{args.sql_test_dir or '无'}` |
 | RPC 地址 | `{args.rpc_endpoint or '无'}` |
+| 屏蔽配置 | `{args.special_query or '无'}` |
 | 执行脚本 | `{args.script}` |
 | 远端命令 | `{args.remote_command or '无'}` |
 | 远端日志 | `{args.remote_log or '无'}` |
