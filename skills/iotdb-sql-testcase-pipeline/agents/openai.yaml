@@ -1,7 +1,7 @@
 interface:
   display_name: "IoTDB SQL Testcase Pipeline"
   short_description: "IoTDB SQL cases, .run, setup/test execution"
-  default_prompt: "Use $iotdb-sql-testcase-pipeline to generate detailed Markdown cases, auto-generate .run files, verify the provided IoTDB and SQL-test directories, configure tree/table mode for 1C1D or 3C3D from one cluster host, sync dn_rpc_address with iotdbURL on fixed port 6667, use no query parameters for tree mode, run setup then clean/restart and run test, collect artifacts, and build the fixed report."
+  default_prompt: "Use $iotdb-sql-testcase-pipeline to generate detailed Markdown cases, auto-generate .run files, verify the provided IoTDB and SQL-test directories, configure tree/table mode for 1C1D or 3C3D from one cluster host, sync dn_rpc_address with iotdbURL on fixed port 6667, use no query parameters for tree mode, update special_query.csv for volatile result columns, run setup then clean/restart and run test, collect artifacts, and build the fixed report."
 
 policy:
   allow_implicit_invocation: true

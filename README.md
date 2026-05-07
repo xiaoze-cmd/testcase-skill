@@ -14,6 +14,7 @@
 - 支持 `1C1D` 和 `3C3D` 两种执行拓扑
 - 支持树模型和表模型，两者配置不同
 - 自动同步 IoTDB `dn_rpc_address` 与 SQL-test `iotdbURL`，端口固定为 `6667`
+- 根据需要维护 SQL-test `special_query.csv` 屏蔽文件，用于忽略不稳定结果列
 - 先跑 `setup` 模式生成 `.result`
 - 重启并清理 IoTDB `data`、`logs` 后，再跑 `test` 模式生成 `.out`
 - 拉回 `.result`、`.out`、`result.xml`、日志、截图，并生成固定格式执行报告
@@ -88,6 +89,39 @@ dn_rpc_address=<rpc_address>
 iotdbURL=jdbc:iotdb://<rpc_address>:6667?version=V_1_0&sql_dialect=table
 ```
 
+## 结果列屏蔽文件
+
+SQL-test 还有一个结果列屏蔽文件：
+
+```text
+<SQL-test 工具目录>/user/CONFIG/special_query.csv
+```
+
+当某些查询只有部分列会因为时间、节点、任务 ID、耗时、构建信息等因素变化，但其他结果仍需要稳定对比时，不要直接把查询改成 `<<CHECKCODE;`，应优先在 `special_query.csv` 中添加屏蔽列。
+
+写法：
+
+```csv
+SQL语句;屏蔽列名;屏蔽列名
+```
+
+示例：
+
+```csv
+show queries;query_id;start_time;datanode_id;elapsed_time;wait_time_in_server;
+show regions;RegionId;CreateTime;TsFileSize;CompressionRatio;InternalAddress;
+select * from root.**;Time;
+```
+
+注意：
+
+- 第一列 SQL 必须和 `.run` 中的查询语句一致，大小写不敏感，前后空格会被忽略。
+- SQL 字段里不要带结尾分号，因为分号是 CSV 分隔符。
+- 后面的字段都是需要屏蔽的列名，列名大小写不敏感。
+- 如果 SQL 或列名写错，工具通常不会报错，只是屏蔽不生效。
+- 必须在 `setup` 模式执行前配置好，否则 `.result` 和 `.out` 可能不是同一套屏蔽规则。
+- 如果 `test` 后才发现因为某个不稳定列导致对比失败，应更新 `special_query.csv` 后重新执行 `setup -> 清理重启 -> test`。
+
 ## 1C1D 完整执行 Prompt
 
 复制下面的 prompt，并替换尖括号里的内容：
@@ -102,10 +136,11 @@ Use $iotdb-sql-testcase-pipeline.
 3. 使用我传入的 IoTDB 安装目录和 SQL-test 工具目录，先检查目录是否存在、配置是否正确，再执行操作。
 4. 根据模型类型配置 SQL-test：表模型需要 sql_dialect=table，树模型不能保留 sql_dialect=table。
 5. 读取 IoTDB 的 dn_rpc_address；SQL-test 的 iotdbURL 要同步成相同 IP，端口固定为 6667。
-6. 先把 SQL-test 改成 setup 模式并执行，生成 .result。
-7. setup 执行完成后，停止 IoTDB，删除 IoTDB 安装目录下的 data 和 logs，再启动 IoTDB。
-8. 再把 SQL-test 改成 test 模式执行，生成 .out 并对比 result.xml。
-9. 拉回 .result、.out、result.xml、日志和截图，生成 execution-report.md。
+6. 检查是否存在时间、任务 ID、耗时、节点地址等不稳定列；如有，先备份并更新 user/CONFIG/special_query.csv。
+7. 先把 SQL-test 改成 setup 模式并执行，生成 .result。
+8. setup 执行完成后，停止 IoTDB，删除 IoTDB 安装目录下的 data 和 logs，再启动 IoTDB。
+9. 再把 SQL-test 改成 test 模式执行，生成 .out 并对比 result.xml。
+10. 拉回 .result、.out、result.xml、special_query.csv、日志和截图，生成 execution-report.md。
 
 拓扑：1C1D
 模型类型：<tree 或 table>
@@ -135,10 +170,11 @@ Use $iotdb-sql-testcase-pipeline.
 4. 根据模型类型配置 SQL-test：表模型需要 sql_dialect=table，树模型不能保留 sql_dialect=table。
 5. 读取该节点配置中的 dn_rpc_address；SQL-test 的 iotdbURL 要同步成相同 IP，端口固定为 6667。
 6. SQL-test 可以在指定执行主机上跑，但 iotdbURL 必须指向配置文件里的 dn_rpc_address，不要默认等同于 SQL-test 执行主机。
-7. 先把 SQL-test 改成 setup 模式并执行，生成 .result。
-8. setup 执行完成后，停止该集群节点上的 IoTDB，删除该 IoTDB 安装目录下的 data 和 logs，再启动 IoTDB。
-9. 再把 SQL-test 改成 test 模式执行，生成 .out 并对比 result.xml。
-10. 拉回 .result、.out、result.xml、日志和截图，生成 execution-report.md。
+7. 检查是否存在时间、任务 ID、耗时、节点地址等不稳定列；如有，先备份并更新 user/CONFIG/special_query.csv。
+8. 先把 SQL-test 改成 setup 模式并执行，生成 .result。
+9. setup 执行完成后，停止该集群节点上的 IoTDB，删除该 IoTDB 安装目录下的 data 和 logs，再启动 IoTDB。
+10. 再把 SQL-test 改成 test 模式执行，生成 .out 并对比 result.xml。
+11. 拉回 .result、.out、result.xml、special_query.csv、日志和截图，生成 execution-report.md。
 
 拓扑：3C3D
 模型类型：<tree 或 table>
@@ -189,5 +225,6 @@ skills/
 - 树模型和表模型配置不同，不能混用 `sql_dialect=table`。
 - 修改 IoTDB `dn_rpc_address` 后，必须同步 SQL-test `iotdbURL`；端口固定为 `6667`。
 - 树模型 `iotdbURL` 只保留到 `jdbc:iotdb://<rpc_address>:6667`，端口后不能带 `?version=...` 或其他参数。
+- 只有部分列不稳定时，优先用 `special_query.csv` 屏蔽对应列，不要直接用 `<<CHECKCODE;` 放弃整条查询结果对比。
 - setup/test 双阶段执行之间需要重启 IoTDB，并清理 verified IoTDB 目录下的 `data` 和 `logs`。
 - 不要把 SSH 密码、API token、私钥等敏感信息写入仓库文件。

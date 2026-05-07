@@ -15,6 +15,7 @@
 | IoTDB 安装目录 | `<远端 IoTDB 安装目录>` |
 | SQL-test 工具目录 | `<远端 SQL-test 工具目录>` |
 | RPC 地址 | `<dn_rpc_address:dn_rpc_port>` |
+| 屏蔽配置 | `<special_query.csv 路径；无则填“无”>` |
 | 执行脚本 | `<run/sh/ps1 脚本路径>` |
 | 远端命令 | `<实际执行命令>` |
 | 远端日志 | `<远端日志路径>` |

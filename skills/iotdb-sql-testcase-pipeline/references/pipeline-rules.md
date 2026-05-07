@@ -268,17 +268,18 @@ For full automated execution, use the two-phase sequence below to avoid dirty da
 3. Lint Markdown and `.run`.
 4. Deploy `.run` to `<SQL_TEST_DIR>/user/scripts/<feature>/<case-name>.run`.
 5. Configure `otf_new.properties` for topology, model, and synchronized `iotdbURL`.
-6. Set SQL-test execution mode to `setup`. The exact property key must be verified in `otf_new.properties` or `test.sh`; commonly it is a setup/test mode flag.
-7. Run:
+6. Configure `user/CONFIG/special_query.csv` if any query has volatile columns that should be ignored in `.result`/`.out` comparison.
+7. Set SQL-test execution mode to `setup`. The exact property key must be verified in `otf_new.properties` or `test.sh`; commonly it is a setup/test mode flag.
+8. Run:
 
 ```bash
 cd "$SQL_TEST_DIR"
 ./test.sh
 ```
 
-8. Collect generated `.result` files and setup logs.
-9. Stop IoTDB on the supplied `1C1D` host or supplied `3C3D` cluster access host.
-10. Resolve and verify cleanup paths before deletion:
+9. Collect generated `.result` files and setup logs.
+10. Stop IoTDB on the supplied `1C1D` host or supplied `3C3D` cluster access host.
+11. Resolve and verify cleanup paths before deletion:
 
 ```bash
 cd "$IOTDB_DIR"
@@ -286,20 +287,51 @@ pwd
 test -d "$IOTDB_DIR/data" && test -d "$IOTDB_DIR/logs"
 ```
 
-11. Delete only the verified IoTDB data/log directories:
+12. Delete only the verified IoTDB data/log directories:
 
 ```bash
 rm -rf "$IOTDB_DIR/data" "$IOTDB_DIR/logs"
 ```
 
-12. Restart IoTDB on the supplied `1C1D` host or supplied `3C3D` cluster access host.
-13. Re-check process and RPC port `6667`.
-14. Set SQL-test execution mode to `test`.
-15. Run `./test.sh` again.
-16. Pull back `.out`, `result.xml`, test logs, and any updated `.result` references needed for diagnosis.
-17. Compare case counts and failures before reporting.
+13. Restart IoTDB on the supplied `1C1D` host or supplied `3C3D` cluster access host.
+14. Re-check process and RPC port `6667`.
+15. Set SQL-test execution mode to `test`.
+16. Run `./test.sh` again.
+17. Pull back `.out`, `result.xml`, test logs, `special_query.csv`, and any updated `.result` references needed for diagnosis.
+18. Compare case counts and failures before reporting.
 
 Do not skip the restart and cleanup between setup and test unless the user explicitly requests a faster non-isolated run.
+
+## Result Column Masking
+
+SQL-test uses `user/CONFIG/special_query.csv` to hide selected result columns before writing or comparing `.result` and `.out`. Use it when the query result is meaningful but one or more columns are expected to differ between setup and test runs, such as time, query ID, elapsed time, DataNode ID, region creation time, build info, usage, estimated remaining seconds, or environment-specific internal addresses.
+
+Format:
+
+```csv
+sql;column_name;column_name
+```
+
+Examples:
+
+```csv
+show queries;query_id;start_time;datanode_id;elapsed_time;wait_time_in_server;
+show regions;RegionId;CreateTime;TsFileSize;CompressionRatio;InternalAddress;
+select * from root.**;Time;
+```
+
+Rules observed from the SQL-test implementation:
+
+- The file path is `<SQL_TEST_DIR>/user/CONFIG/special_query.csv`.
+- The first field is the SQL text. It must exactly match the `.run` query text after trimming, ignoring case.
+- Do not include the SQL terminator semicolon as part of the SQL field. The semicolon is the CSV delimiter.
+- Fields after the SQL are column names to mask. Column name matching is case-insensitive.
+- Multiple columns are separated by English semicolons.
+- A trailing semicolon is allowed.
+- If the SQL does not match or a column name is wrong, the mask silently has no effect.
+- Back up `special_query.csv` before editing.
+- Update this file before setup mode. If a mismatch is found after test mode because a volatile column was not masked, update `special_query.csv`, clear generated artifacts for that case, and rerun setup -> clean/restart -> test.
+- Prefer `special_query.csv` for column-level masking. Use `<<CHECKCODE;` only when the whole query result is inherently unstable or not useful for comparison.
 
 ## Artifact Collection
 
@@ -316,6 +348,7 @@ Pull back these artifacts when present:
 *.result
 *.out
 result.xml
+special_query.csv
 *.log
 wrapper stdout/stderr
 export directories or validation summaries
@@ -333,6 +366,7 @@ Reports must stay short. Fill only:
 - Failure detail rows, or `无`.
 - Screenshot/evidence image paths.
 - Necessary notes such as setup/test mode, data/log cleanup, baseline source, and version differences.
+- Mention any `special_query.csv` masking entries added for this run.
 
 If screenshots are requested, create or attach at least:
 
