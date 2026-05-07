@@ -16,6 +16,7 @@ Always prefer the current repository's `AGENTS.md` if present. It is the project
 - Read `references/pipeline-rules.md` before generating `.run`, touching remote servers, switching models, restarting IoTDB, executing cases, or writing reports.
 - Use `assets/test-execution-report-template.md` as the fixed report shape.
 - Use `scripts/lint_case_artifacts.py` before deploying generated Markdown/`.run` artifacts when Python is available.
+- Use `scripts/suggest_special_query_masks.py` after SQL-test comparison failures to list `.result`/`.out` differing result columns and produce candidate `special_query.csv` rows.
 - Use `scripts/build_execution_report.py` to create a fixed report from execution metrics when the report does not already exist.
 
 ## Workflow
@@ -75,6 +76,7 @@ Treat these as defaults, not facts. Verify active paths and configs on the remot
 - For SQL-test config, table and tree model are different. Table mode must use `sql_dialect=table`; tree mode must remove everything after port `6667` from `iotdbURL`.
 - Keep DataNode `dn_rpc_address` and SQL-test `iotdbURL` synchronized. The RPC port is fixed to `6667`; SQL-test should connect to `jdbc:iotdb://<dn_rpc_address>:6667...` for table mode and exactly `jdbc:iotdb://<dn_rpc_address>:6667` for tree mode.
 - Use `special_query.csv` for column-level result masking when only some output columns are unstable. Do not replace a deterministic query with `<<CHECKCODE;` just to hide one volatile column.
+- When `###### COMPARE RESULT : FAIL ######` appears, compare `.result` and `.out` and list real result-table column differences before editing `special_query.csv`. Ignore SQL-test status/footer differences such as `Elapsed Time`; they are not `special_query.csv` columns.
 - Update `special_query.csv` before setup mode so `.result` and `.out` are generated with the same masked columns. If masking is discovered after a mismatch, update the CSV and rerun the full setup -> clean/restart -> test sequence.
 - For performance cases, include data volume, concurrency or loop count, warm-up behavior, measured metric, threshold/baseline rule, cleanup policy, and remote output path.
 

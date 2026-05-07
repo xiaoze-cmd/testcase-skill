@@ -332,6 +332,16 @@ Rules observed from the SQL-test implementation:
 - Back up `special_query.csv` before editing.
 - Update this file before setup mode. If a mismatch is found after test mode because a volatile column was not masked, update `special_query.csv`, clear generated artifacts for that case, and rerun setup -> clean/restart -> test.
 - Prefer `special_query.csv` for column-level masking. Use `<<CHECKCODE;` only when the whole query result is inherently unstable or not useful for comparison.
+- Do not add SQL-test footer/status lines such as `Elapsed Time` or `###### COMPARE RESULT : FAIL ######` to `special_query.csv`. They are tool output, not query result columns.
+- A query result column named `elapsed_time` may be a valid mask candidate for statements such as `show queries`; the footer line `Elapsed Time: ...` is not.
+
+When SQL-test reports `###### COMPARE RESULT : FAIL ######`, analyze the actual `.result` and `.out` differences before editing the CSV:
+
+```bash
+python scripts/suggest_special_query_masks.py --result path/to/case.result --out path/to/case.out
+```
+
+The script lists differing result-table columns and suggests `special_query.csv` rows only for known volatile columns by default. It ignores tool footer/status lines such as `Elapsed Time`. If a difference is in a business column, inspect it manually instead of masking it.
 
 ## Artifact Collection
 
