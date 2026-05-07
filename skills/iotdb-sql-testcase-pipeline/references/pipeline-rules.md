@@ -343,6 +343,17 @@ python scripts/suggest_special_query_masks.py --result path/to/case.result --out
 
 The script lists differing result-table columns and suggests `special_query.csv` rows only for known volatile columns by default. It ignores tool footer/status lines such as `Elapsed Time`. If a difference is in a business column, inspect it manually instead of masking it.
 
+After suggesting mask columns, state the exact SQL and differing columns, then offer two choices:
+
+1. Re-run comparison after another test execution if the difference may be caused by environment noise.
+2. Append/merge the suggested mask columns into `special_query.csv`.
+
+Only append after the user chooses that option. Use:
+
+```bash
+python scripts/suggest_special_query_masks.py --result path/to/case.result --out path/to/case.out --special-query "$SQL_TEST_DIR/user/CONFIG/special_query.csv" --append
+```
+
 ## Artifact Collection
 
 Do not claim all cases passed unless:

@@ -129,6 +129,15 @@ select * from root.**;Time;
 ```text
 请使用 scripts/suggest_special_query_masks.py 对比 .result 和 .out，列出真实不同的结果列，并给出建议追加到 special_query.csv 的行。
 注意不要把 Elapsed Time 或 COMPARE RESULT : FAIL 这类工具状态行当作屏蔽列。
+如果检测到可屏蔽差异列，请说明是哪条 SQL 的哪些列在 result/out 中不一致，并给出两个选择：
+1. 再次运行比对。
+2. 追加屏蔽列到 special_query.csv。
+```
+
+用户确认追加后，可以执行：
+
+```text
+python scripts/suggest_special_query_masks.py --result <case.result> --out <case.out> --special-query <SQL-test 工具目录>/user/CONFIG/special_query.csv --append
 ```
 
 ## 1C1D 完整执行 Prompt
