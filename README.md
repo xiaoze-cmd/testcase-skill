@@ -121,6 +121,15 @@ select * from root.**;Time;
 - 如果 SQL 或列名写错，工具通常不会报错，只是屏蔽不生效。
 - 必须在 `setup` 模式执行前配置好，否则 `.result` 和 `.out` 可能不是同一套屏蔽规则。
 - 如果 `test` 后才发现因为某个不稳定列导致对比失败，应更新 `special_query.csv` 后重新执行 `setup -> 清理重启 -> test`。
+- 如果 `.out` 中出现 `###### COMPARE RESULT : FAIL ######`，需要先比较 `.result` 和 `.out` 的真实结果列差异，再决定是否写入 `special_query.csv`。
+- `Elapsed Time: ...` 这种工具耗时行不是结果列，不要写入 `special_query.csv`；但查询结果列里的 `elapsed_time` 可以作为候选屏蔽列。
+
+可以让 Codex 用辅助脚本先列出差异列：
+
+```text
+请使用 scripts/suggest_special_query_masks.py 对比 .result 和 .out，列出真实不同的结果列，并给出建议追加到 special_query.csv 的行。
+注意不要把 Elapsed Time 或 COMPARE RESULT : FAIL 这类工具状态行当作屏蔽列。
+```
 
 ## 1C1D 完整执行 Prompt
 
