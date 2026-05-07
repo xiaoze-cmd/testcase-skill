@@ -13,7 +13,7 @@
 - 根据用户传入的 IoTDB 安装目录和 SQL-test 工具目录做远端检查
 - 支持 `1C1D` 和 `3C3D` 两种执行拓扑
 - 支持树模型和表模型，两者配置不同
-- 自动同步 IoTDB `dn_rpc_address`/`dn_rpc_port` 与 SQL-test `iotdbURL`
+- 自动同步 IoTDB `dn_rpc_address` 与 SQL-test `iotdbURL`，端口固定为 `6667`
 - 先跑 `setup` 模式生成 `.result`
 - 重启并清理 IoTDB `data`、`logs` 后，再跑 `test` 模式生成 `.out`
 - 拉回 `.result`、`.out`、`result.xml`、日志、截图，并生成固定格式执行报告
@@ -49,13 +49,14 @@ Use $iotdb-sql-testcase-pipeline.
 | 模型类型 | `tree` 或 `table` |
 | IoTDB 安装目录 | `/data/iotdb-enterprise-xxx/iotdb-enterprise-xxx-bin` |
 | SQL-test 工具目录 | `/data/iotdb-sql-test-master` |
-| SQL-test 执行主机 | `172.20.70.47` |
-| 1C1D 主机 | `172.20.70.47` |
-| 3C3D 主机列表 | `172.20.70.47, 172.20.70.48, 172.20.70.49` |
+| SQL-test 执行主机 | `<SQL-test 所在主机 IP>` |
+| 1C1D 主机 | `<1C1D 主机 IP>` |
+| 3C3D 集群节点 | `<集群任意一个节点 IP>` |
 | SSH 用户和 key | `ubuntu`、`IOTDB_SSH_KEY` 或本地 key 路径 |
 | 需求内容 | 需求文档、设计文档、官网链接或 issue 内容 |
 
 Codex 会先验证传入的 IoTDB 目录和 SQL-test 目录，再执行后续操作；不会优先使用旧记忆里的路径覆盖用户传入的路径。
+针对 `3C3D` 集群测试，只需要提供集群中的任意一个节点 IP，不需要提供三台主机 IP。
 
 ## 关键配置规则
 
@@ -65,27 +66,26 @@ Codex 会先验证传入的 IoTDB 目录和 SQL-test 目录，再执行后续操
 
 ```properties
 DBtype=IOTDB
-iotdbURL=jdbc:iotdb://<rpc_address>:<rpc_port>?version=V_1_0&sql_dialect=table
+iotdbURL=jdbc:iotdb://<rpc_address>:6667?version=V_1_0&sql_dialect=table
 ```
 
 树模型示例：
 
 ```properties
 DBtype=IOTDB
-iotdbURL=jdbc:iotdb://<rpc_address>:<rpc_port>?version=V_1_0
+iotdbURL=jdbc:iotdb://<rpc_address>:6667
 ```
 
 如果 IoTDB DataNode 配置中修改了：
 
 ```properties
-dn_rpc_address=172.20.70.49
-dn_rpc_port=6667
+dn_rpc_address=<rpc_address>
 ```
 
-那么 SQL-test 的 `iotdbURL` 也必须同步为对应 IP 和端口。例如表模型应为：
+那么 SQL-test 的 `iotdbURL` 也必须同步为对应 IP；端口固定使用 `6667`。例如表模型应为：
 
 ```properties
-iotdbURL=jdbc:iotdb://172.20.70.49:6667?version=V_1_0&sql_dialect=table
+iotdbURL=jdbc:iotdb://<rpc_address>:6667?version=V_1_0&sql_dialect=table
 ```
 
 ## 1C1D 完整执行 Prompt
@@ -101,7 +101,7 @@ Use $iotdb-sql-testcase-pipeline.
 2. Markdown 静态检查通过后，自动生成 .run 文件，不要停在 Markdown 阶段。
 3. 使用我传入的 IoTDB 安装目录和 SQL-test 工具目录，先检查目录是否存在、配置是否正确，再执行操作。
 4. 根据模型类型配置 SQL-test：表模型需要 sql_dialect=table，树模型不能保留 sql_dialect=table。
-5. 读取 IoTDB 的 dn_rpc_address 和 dn_rpc_port；如果修改了 dn_rpc_address，SQL-test 的 iotdbURL 也要同步成相同 IP 和端口。
+5. 读取 IoTDB 的 dn_rpc_address；SQL-test 的 iotdbURL 要同步成相同 IP，端口固定为 6667。
 6. 先把 SQL-test 改成 setup 模式并执行，生成 .result。
 7. setup 执行完成后，停止 IoTDB，删除 IoTDB 安装目录下的 data 和 logs，再启动 IoTDB。
 8. 再把 SQL-test 改成 test 模式执行，生成 .out 并对比 result.xml。
@@ -131,23 +131,22 @@ Use $iotdb-sql-testcase-pipeline.
 执行要求：
 1. 先根据需求生成详细 Markdown 表格形式用例文件。
 2. Markdown 静态检查通过后，自动生成 .run 文件，不要停在 Markdown 阶段。
-3. 使用我传入的 IoTDB 安装目录和 SQL-test 工具目录，先分别检查三台 IoTDB 节点目录是否存在、配置是否正确，再执行操作。
+3. 使用我传入的 IoTDB 安装目录和 SQL-test 工具目录，先检查该集群节点上的目录是否存在、配置是否正确，再执行操作。
 4. 根据模型类型配置 SQL-test：表模型需要 sql_dialect=table，树模型不能保留 sql_dialect=table。
-5. 读取选定 DataNode 的 dn_rpc_address 和 dn_rpc_port；如果修改了 dn_rpc_address，SQL-test 的 iotdbURL 也要同步成相同 IP 和端口。
-6. SQL-test 可以在指定执行主机上跑，但 iotdbURL 必须指向选定 DataNode 的 RPC 地址，不要默认等同于 SQL-test 执行主机。
+5. 读取该节点配置中的 dn_rpc_address；SQL-test 的 iotdbURL 要同步成相同 IP，端口固定为 6667。
+6. SQL-test 可以在指定执行主机上跑，但 iotdbURL 必须指向配置文件里的 dn_rpc_address，不要默认等同于 SQL-test 执行主机。
 7. 先把 SQL-test 改成 setup 模式并执行，生成 .result。
-8. setup 执行完成后，停止三台 IoTDB 节点，删除每台 IoTDB 安装目录下的 data 和 logs，再启动三台 IoTDB 节点。
+8. setup 执行完成后，停止该集群节点上的 IoTDB，删除该 IoTDB 安装目录下的 data 和 logs，再启动 IoTDB。
 9. 再把 SQL-test 改成 test 模式执行，生成 .out 并对比 result.xml。
 10. 拉回 .result、.out、result.xml、日志和截图，生成 execution-report.md。
 
 拓扑：3C3D
 模型类型：<tree 或 table>
-3C3D 主机列表：<主机1>, <主机2>, <主机3>
+3C3D 集群节点：<集群任意一个节点 IP>
 SQL-test 执行主机：<主机 IP>
-SQL-test 连接的 DataNode RPC 主机：<主机 IP，可从 dn_rpc_address 得到>
 SSH 用户：<ubuntu 或其他用户>
 SSH key：<IOTDB_SSH_KEY 或本地 key 路径>
-IoTDB 安装目录：<三台机器相同的远端 IoTDB 安装目录>
+IoTDB 安装目录：<远端 IoTDB 安装目录>
 SQL-test 工具目录：<远端 /data/iotdb-sql-test-master 等目录>
 
 需求：
@@ -188,6 +187,7 @@ skills/
 - 默认是 Markdown 检查通过后自动生成 `.run`。
 - 远端执行前必须确认目标主机、IoTDB 安装目录、SQL-test 工具目录、目标 `.run` 文件和 `otf_new.properties`。
 - 树模型和表模型配置不同，不能混用 `sql_dialect=table`。
-- 修改 IoTDB `dn_rpc_address` 或 `dn_rpc_port` 后，必须同步 SQL-test `iotdbURL`。
+- 修改 IoTDB `dn_rpc_address` 后，必须同步 SQL-test `iotdbURL`；端口固定为 `6667`。
+- 树模型 `iotdbURL` 只保留到 `jdbc:iotdb://<rpc_address>:6667`，端口后不能带 `?version=...` 或其他参数。
 - setup/test 双阶段执行之间需要重启 IoTDB，并清理 verified IoTDB 目录下的 `data` 和 `logs`。
 - 不要把 SSH 密码、API token、私钥等敏感信息写入仓库文件。
