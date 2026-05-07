@@ -11,8 +11,8 @@ Collect these before execution. If the user already provides the IoTDB install d
 | Topology | Yes | `1C1D` or `3C3D`. |
 | Model | Yes | `table`, `tree`, or both. |
 | Source docs | Yes | Requirement/design docs, official docs URLs, or issue text. |
-| Remote host list | Yes | One host for `1C1D`; three hosts for `3C3D`. |
-| SQL-test runner host | Yes | May be the same as an IoTDB node; default to the first host only after verification. |
+| Cluster access host | Yes | One host is enough for both `1C1D` and `3C3D`; for `3C3D`, use any reachable cluster node. |
+| SQL-test runner host | Yes | May be the same as the cluster access host. |
 | SSH identity | Yes | Use `IOTDB_SSH_KEY` or a local private key path; never write passwords. |
 | IoTDB install path | Yes | User may pass it directly. Verify `conf/` and `sbin/` before use. |
 | SQL-test tool path | Yes | User may pass it directly. Verify `test.sh` and `user/CONFIG/otf_new.properties`. |
@@ -30,11 +30,12 @@ If a requested detail can be discovered safely from local files or the remote se
 
 ### 3C3D
 
-- Use three hosts. Each host may run both ConfigNode and DataNode.
-- Verify the supplied IoTDB directory on all three hosts.
-- Run node-level start/stop commands on all three hosts.
-- Choose one SQL-test runner host explicitly. If not supplied, use the first verified host.
-- Choose one DataNode RPC endpoint for SQL-test. It must match the chosen DataNode's `dn_rpc_address` and `dn_rpc_port`.
+- Do not require three host IPs from the user. One reachable cluster node IP is enough.
+- Verify the supplied IoTDB directory on that cluster node.
+- Read that node's `dn_rpc_address` from `conf/iotdb-datanode.properties`; SQL-test should connect to that address.
+- Use fixed RPC port `6667`.
+- Choose one SQL-test runner host explicitly. It may be the same as the cluster access host.
+- Do not assume the SQL-test runner host is the same as `dn_rpc_address`; always follow the config value.
 
 ## Directory Verification
 
@@ -147,7 +148,7 @@ Tree and table models use different SQL-test and SQL rules.
 
 ```properties
 DBtype=IOTDB
-iotdbURL=jdbc:iotdb://<rpc_address>:<rpc_port>?version=V_1_0&sql_dialect=table
+iotdbURL=jdbc:iotdb://<rpc_address>:6667?version=V_1_0&sql_dialect=table
 ```
 
 - `.run` should create a database and then run `use <database>;`.
@@ -157,10 +158,11 @@ iotdbURL=jdbc:iotdb://<rpc_address>:<rpc_port>?version=V_1_0&sql_dialect=table
 ### Tree Model
 
 - Do not keep `sql_dialect=table` in `iotdbURL`.
+- Remove everything after the port. Tree-model SQL-test URLs must not contain `?version=...` or any other query parameters.
 
 ```properties
 DBtype=IOTDB
-iotdbURL=jdbc:iotdb://<rpc_address>:<rpc_port>?version=V_1_0
+iotdbURL=jdbc:iotdb://<rpc_address>:6667
 ```
 
 - `.run` must not use `use <database>;`.
@@ -172,32 +174,31 @@ iotdbURL=jdbc:iotdb://<rpc_address>:<rpc_port>?version=V_1_0
 Before running SQL-test, inspect DataNode RPC config:
 
 ```bash
-grep -E '^(dn_rpc_address|dn_rpc_port)=' "$IOTDB_DIR/conf/iotdb-datanode.properties"
+grep -E '^dn_rpc_address=' "$IOTDB_DIR/conf/iotdb-datanode.properties"
 ```
 
 Rules:
 
 - `dn_rpc_address` is the IP SQL-test should connect to unless the user passes a different reachable RPC endpoint.
-- `dn_rpc_port` is the port SQL-test should connect to; default is usually `6667`, but verify the file.
+- The RPC port is fixed as `6667`; do not ask the user to provide a port.
 - If you edit `dn_rpc_address`, update `iotdbURL` in `otf_new.properties` to the same IP.
-- If you edit `dn_rpc_port`, update `iotdbURL` to the same port.
-- Preserve unrelated JDBC parameters.
-- Ensure `sql_dialect=table` exists only for table model.
+- Ensure table-model `iotdbURL` is `jdbc:iotdb://<rpc_address>:6667?version=V_1_0&sql_dialect=table`.
+- Ensure tree-model `iotdbURL` is exactly `jdbc:iotdb://<rpc_address>:6667`.
+- Do not preserve `?version=...` for tree model.
 
 Example: if DataNode config contains:
 
 ```properties
-dn_rpc_address=172.20.70.49
-dn_rpc_port=6667
+dn_rpc_address=<rpc_address>
 ```
 
 Then table-model SQL-test config should use:
 
 ```properties
-iotdbURL=jdbc:iotdb://172.20.70.49:6667?version=V_1_0&sql_dialect=table
+iotdbURL=jdbc:iotdb://<rpc_address>:6667?version=V_1_0&sql_dialect=table
 ```
 
-For `3C3D`, do not assume the SQL-test runner host is the same as the RPC endpoint. The SQL-test runner may be host A while the selected DataNode RPC endpoint is host B; `iotdbURL` must still point to the selected DataNode's `dn_rpc_address`.
+For `3C3D`, do not require three node IPs. The SQL-test runner may be one host while `iotdbURL` points to the `dn_rpc_address` value read from the cluster node config.
 
 Back up config files before editing:
 
@@ -213,8 +214,8 @@ Use SSH/SCP with key authentication. Example shape on Windows:
 ```powershell
 $key = $env:IOTDB_SSH_KEY
 if (-not $key) { $key = "C:\Users\tiany\.ssh\sql_testcase_automation_ed25519" }
-ssh -i $key ubuntu@172.20.70.47 "hostname && date"
-scp -i $key local.run ubuntu@172.20.70.47:/tmp/local.run
+ssh -i $key ubuntu@<host> "hostname && date"
+scp -i $key local.run ubuntu@<host>:/tmp/local.run
 ```
 
 Before deployment:
@@ -256,7 +257,7 @@ sudo -n ./sbin/stop-confignode.sh
 sudo -n ./sbin/stop-datanode.sh
 ```
 
-For `1C1D`, run start/stop on the single IoTDB host. For `3C3D`, run start/stop on all three IoTDB hosts. If `sudo -n` fails, do not embed passwords. Report that passwordless sudo or an interactive secure method is required.
+For `1C1D`, run start/stop on the single IoTDB host. For `3C3D`, run start/stop on the supplied cluster access host; do not demand three host IPs. If `sudo -n` fails, do not embed passwords. Report that passwordless sudo or an interactive secure method is required.
 
 ## Setup/Test Execution Sequence
 
@@ -276,7 +277,7 @@ cd "$SQL_TEST_DIR"
 ```
 
 8. Collect generated `.result` files and setup logs.
-9. Stop IoTDB on the `1C1D` node or all `3C3D` nodes.
+9. Stop IoTDB on the supplied `1C1D` host or supplied `3C3D` cluster access host.
 10. Resolve and verify cleanup paths before deletion:
 
 ```bash
@@ -291,8 +292,8 @@ test -d "$IOTDB_DIR/data" && test -d "$IOTDB_DIR/logs"
 rm -rf "$IOTDB_DIR/data" "$IOTDB_DIR/logs"
 ```
 
-12. Restart IoTDB on the `1C1D` node or all `3C3D` nodes.
-13. Re-check process and RPC port.
+12. Restart IoTDB on the supplied `1C1D` host or supplied `3C3D` cluster access host.
+13. Re-check process and RPC port `6667`.
 14. Set SQL-test execution mode to `test`.
 15. Run `./test.sh` again.
 16. Pull back `.out`, `result.xml`, test logs, and any updated `.result` references needed for diagnosis.
