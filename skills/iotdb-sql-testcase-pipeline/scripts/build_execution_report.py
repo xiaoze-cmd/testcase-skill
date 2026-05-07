@@ -20,6 +20,12 @@ def main() -> int:
     parser.add_argument("--requirement", required=True)
     parser.add_argument("--version", required=True)
     parser.add_argument("--environment", required=True)
+    parser.add_argument("--topology", default="")
+    parser.add_argument("--model", default="")
+    parser.add_argument("--iotdb-dir", default="", dest="iotdb_dir")
+    parser.add_argument("--sql-test-dir", default="", dest="sql_test_dir")
+    parser.add_argument("--rpc-endpoint", default="", dest="rpc_endpoint")
+    parser.add_argument("--execution-mode", default="", dest="execution_mode")
     parser.add_argument("--script", required=True)
     parser.add_argument("--remote-command", default="")
     parser.add_argument("--remote-log", default="")
@@ -51,10 +57,16 @@ def main() -> int:
 | 版本 | `{args.version}` |
 | 执行日期 | `{args.date}` |
 | 执行环境 | `{args.environment}` |
+| 拓扑 | `{args.topology or '无'}` |
+| 模型 | `{args.model or '无'}` |
+| IoTDB 安装目录 | `{args.iotdb_dir or '无'}` |
+| SQL-test 工具目录 | `{args.sql_test_dir or '无'}` |
+| RPC 地址 | `{args.rpc_endpoint or '无'}` |
 | 执行脚本 | `{args.script}` |
 | 远端命令 | `{args.remote_command or '无'}` |
 | 远端日志 | `{args.remote_log or '无'}` |
 | 远端产物 | `{args.remote_artifacts or '无'}` |
+| 执行模式 | `{args.execution_mode or '无'}` |
 
 ## 执行结果
 
