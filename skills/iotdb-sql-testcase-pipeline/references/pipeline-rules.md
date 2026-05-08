@@ -10,7 +10,7 @@ Collect these before execution. If the user already provides the IoTDB install d
 | Version | Yes | Example: `2.0.9.2`, `2.0.10.1`, `1.3.7.3`. |
 | Topology | Yes | `1C1D` or `3C3D`. |
 | Model | Yes | `table`, `tree`, or both. |
-| Source docs | Yes | Requirement/design docs, official docs URLs, or issue text. |
+| Source docs | Yes | Requirement/design docs or issue text. Official docs URLs are optional because the skill searches official manuals by default. |
 | Cluster access host | Yes | One host is enough for both `1C1D` and `3C3D`; for `3C3D`, use any reachable cluster node. |
 | SQL-test runner host | Yes | May be the same as the cluster access host. |
 | SSH identity | Yes | Use `IOTDB_SSH_KEY` or a local private key path; never write passwords. |
@@ -18,6 +18,28 @@ Collect these before execution. If the user already provides the IoTDB install d
 | SQL-test tool path | Yes | User may pass it directly. Verify `test.sh` and `user/CONFIG/otf_new.properties`. |
 
 If a requested detail can be discovered safely from local files or the remote server, discover it instead of stopping.
+
+## Official Manual Lookup
+
+When the user supplies requirement text, a design document, or issue content, search the official user manual even if the user does not provide a docs URL. Use the manual findings to improve syntax coverage, boundary cases, error expectations, and model-specific differences.
+
+Default manual roots:
+
+| Model | Manual root |
+|------|-------------|
+| Tree model | `https://www.timecho.com/docs/zh/UserGuide/latest/` |
+| Table model | `https://www.timecho.com/docs/zh/UserGuide/latest-Table/` |
+| English fallback | `https://www.timecho-global.com/docs/UserGuide/latest/` |
+
+Lookup rules:
+
+- Search with keywords extracted from the requirement/design/issue, including SQL keywords, function names, config keys, error names, and Chinese/English feature names.
+- For `table`, search the table-model manual first; for `tree`, search the tree-model manual first.
+- For `both` or unclear model type, search both tree and table manuals and separate model-specific behavior in the cases.
+- If a version-specific manual can be reached from the docs site and matches the target version, prefer it. Otherwise use the `latest` manual and note the version gap.
+- Treat user-supplied official links as supplements. Do not stop just because no official link was provided.
+- Record relevant manual section names or URLs in the Markdown `需求来源` column and in `.run` `-- 来源:` comments when they affect the case design.
+- If network access or docs search is unavailable, continue from the supplied requirement/design/issue and explicitly note that the official manual lookup could not be completed.
 
 ## Topology Rules
 
@@ -57,7 +79,7 @@ Do not silently fall back to stale remembered paths when the user supplied expli
 
 ## Markdown Case Requirements
 
-Generate Markdown first. The normal full pipeline is automatic: create the Markdown table, self-review and lint it, then generate `.run` without waiting for a separate manual review unless the user requested Markdown-only or review-only mode.
+Generate Markdown first from the user material plus the official manual lookup. The normal full pipeline is automatic: create the Markdown table, self-review and lint it, then generate `.run` without waiting for a separate manual review unless the user requested Markdown-only or review-only mode.
 
 Use a Markdown table. The minimum required columns are:
 
@@ -68,7 +90,7 @@ Use a Markdown table. The minimum required columns are:
 | 用例级别 | `P0`, `P1`, or `P2`. |
 | 模块类型 | Query, auth, function, table model, tree model, cluster, Pipe, tool, performance, etc. |
 | 二级分类 | More specific category. |
-| 需求来源 | Requirement, design doc, official docs section, or issue. |
+| 需求来源 | Requirement, design doc, issue, and relevant official manual section or URL. |
 | 前置条件 | Topology, cluster state, permissions, config, model type. |
 | 测试数据 | Database, table/timeseries, inserted rows, boundary values. |
 | 操作步骤 | Expanded setup, data prep, execution, validation, cleanup. |

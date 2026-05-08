@@ -1,6 +1,6 @@
 ---
 name: iotdb-sql-testcase-pipeline
-description: Use when Codex needs to turn IoTDB/TimechoDB SQL requirements into detailed Markdown cases and .run files, or operate 1C1D/3C3D SQL-test environments from provided IoTDB and sql-test directories, including tree/table config, rpc_address/iotdbURL sync, special_query.csv result masking, setup/test runs, restarts, artifact collection, reports, or screenshots.
+description: Use when Codex needs to turn IoTDB/TimechoDB SQL requirements, design docs, issues, or official manual topics into detailed Markdown cases and .run files, or operate 1C1D/3C3D SQL-test environments from provided IoTDB and sql-test directories, including default official manual lookup, tree/table config, rpc_address/iotdbURL sync, special_query.csv result masking, setup/test runs, restarts, artifact collection, reports, or screenshots.
 ---
 
 # IoTDB SQL Testcase Pipeline
@@ -10,6 +10,8 @@ description: Use when Codex needs to turn IoTDB/TimechoDB SQL requirements into 
 Use this skill to run the end-to-end IoTDB/TimechoDB SQL testcase workflow in a reusable way: requirement analysis, detailed Markdown cases, automatic `.run` generation, SQL-test result-column masking, remote deployment, 1C1D/3C3D cluster handling, tree/table model configuration, setup/test execution, artifact pullback, and fixed-format reporting.
 
 Always prefer the current repository's `AGENTS.md` if present. It is the project memory and may override stale details in this skill. Never store SSH passwords, tokens, or private key material in generated files.
+
+When the user provides requirement text, a design document, or issue content without official documentation links, proactively search the official TimechoDB/IoTDB user manual for related behavior, syntax, constraints, and edge cases before generating cases. Treat user-supplied links as optional supplements, not required inputs.
 
 ## Required References
 
@@ -21,34 +23,39 @@ Always prefer the current repository's `AGENTS.md` if present. It is the project
 
 ## Workflow
 
-1. Collect the requirement text, version directory, target topology (`1C1D` or `3C3D`), target model (`table`, `tree`, or both), official documentation links, one cluster access host, SQL-test runner host, SSH key path, remote IoTDB install directory, and SQL-test tool directory. If the user passes the IoTDB directory and SQL-test directory, treat those as the first paths to verify and execute against. For `3C3D`, do not require three host IPs; one reachable cluster node is enough.
-2. Create or enter a requirement directory named after the requirement item. Put all local artifacts there.
-3. Verify the remote directories before generation/deployment:
+1. Collect the requirement text, version directory, target topology (`1C1D` or `3C3D`), target model (`table`, `tree`, or both), optional official documentation links, one cluster access host, SQL-test runner host, SSH key path, remote IoTDB install directory, and SQL-test tool directory. If the user passes the IoTDB directory and SQL-test directory, treat those as the first paths to verify and execute against. For `3C3D`, do not require three host IPs; one reachable cluster node is enough.
+2. Search the official manual by default:
+   - Tree model: `https://www.timecho.com/docs/zh/UserGuide/latest/`
+   - Table model: `https://www.timecho.com/docs/zh/UserGuide/latest-Table/`
+   - English fallback: `https://www.timecho-global.com/docs/UserGuide/latest/`
+   Use the requirement/design/issue keywords plus the model type. If the model is `both` or unclear, search both tree and table manuals. Record the relevant manual sections in the Markdown `需求来源` field and `.run` source comments.
+3. Create or enter a requirement directory named after the requirement item. Put all local artifacts there.
+4. Verify the remote directories before generation/deployment:
    - IoTDB directory contains expected `conf/` and `sbin/` files.
    - SQL-test directory contains `test.sh`, `user/CONFIG/otf_new.properties`, `user/scripts/`, and `user/result/`.
    - For `3C3D`, verify the supplied cluster access host and choose the SQL-test runner host explicitly.
-4. Generate a detailed Markdown table case file first. Then immediately self-review and lint it. In the normal automatic flow, do not wait for a separate manual review before `.run` generation unless the user asked for "Markdown only" or "review first".
-5. Generate the automation artifact that matches the target:
+5. Generate a detailed Markdown table case file first. Then immediately self-review and lint it. In the normal automatic flow, do not wait for a separate manual review before `.run` generation unless the user asked for "Markdown only" or "review first".
+6. Generate the automation artifact that matches the target:
    - `.run` for SQL automation tool flows.
    - Shell/PowerShell wrapper when the tested behavior is a tool command such as `export-data.sh`.
-6. Run static checks:
+7. Run static checks:
    - Markdown table has the required columns.
    - Every automated case has setup, execution, assertions, cleanup, and stable expected output.
    - Long-running or performance cases are clearly marked.
    - No server password or private key material is written to repo files.
-7. Read `conf/iotdb-datanode.properties` and derive the SQL-test JDBC endpoint from `dn_rpc_address` plus fixed port `6667`. If `dn_rpc_address` is edited, update `iotdbURL` in `otf_new.properties` to the same IP before executing.
-8. Configure SQL-test for the target model:
+8. Read `conf/iotdb-datanode.properties` and derive the SQL-test JDBC endpoint from `dn_rpc_address` plus fixed port `6667`. If `dn_rpc_address` is edited, update `iotdbURL` in `otf_new.properties` to the same IP before executing.
+9. Configure SQL-test for the target model:
    - Table model uses `jdbc:iotdb://<rpc_address>:6667?version=V_1_0&sql_dialect=table`.
    - Tree model uses exactly `jdbc:iotdb://<rpc_address>:6667`; remove `?version=...` and any other query parameters.
-9. Configure `user/CONFIG/special_query.csv` before setup mode when generated cases contain known volatile result columns such as time, query IDs, elapsed time, region IDs, build info, usage, or other environment-dependent columns. Back up the CSV first, then add `SQL;ColumnName;ColumnName` entries that exactly match the query text used in `.run`.
-10. Deploy automation artifacts to the target SQL-test directory using SSH key authentication or an existing secure runtime configuration.
-11. Execute the two-phase automation flow when the user asks for full execution:
+10. Configure `user/CONFIG/special_query.csv` before setup mode when generated cases contain known volatile result columns such as time, query IDs, elapsed time, region IDs, build info, usage, or other environment-dependent columns. Back up the CSV first, then add `SQL;ColumnName;ColumnName` entries that exactly match the query text used in `.run`.
+11. Deploy automation artifacts to the target SQL-test directory using SSH key authentication or an existing secure runtime configuration.
+12. Execute the two-phase automation flow when the user asks for full execution:
    - Set SQL-test mode to `setup`, execute, and collect `.result` artifacts.
    - Stop IoTDB on the supplied `1C1D` host or supplied `3C3D` cluster access host.
    - Clean only the verified IoTDB `data/` and `logs/` directories.
    - Restart IoTDB, re-check RPC port `6667`, set SQL-test mode to `test`, execute again, and collect `.out`, `result.xml`, and logs.
-12. Pull back `.result`, `.out`, `result.xml`, logs, wrapper output, `special_query.csv`, and any exported data summaries needed for validation.
-13. Fill `execution-report.md` using the fixed template. Include only metrics, paths, conclusion, failure rows, notes, and screenshots/evidence images.
+13. Pull back `.result`, `.out`, `result.xml`, logs, wrapper output, `special_query.csv`, and any exported data summaries needed for validation.
+14. Fill `execution-report.md` using the fixed template. Include only metrics, paths, conclusion, failure rows, notes, and screenshots/evidence images.
 
 ## Remote Defaults
 
@@ -68,6 +75,7 @@ Treat these as defaults, not facts. Verify active paths and configs on the remot
 ## Guardrails
 
 - Generate detailed Markdown first, then automatically generate `.run` after static checks pass. If the user asks to skip Markdown, explain that this pipeline requires Markdown as the reviewable source of truth.
+- Do not require the user to provide official documentation links. Search the official manuals by default and cite relevant manual sections when they influence coverage or expected results. If network access is unavailable, state that gap in the report or final response.
 - Do not overwrite `.result` baselines unless the user explicitly asks for setup/baseline generation or full setup/test execution and the version/environment is intentionally under test.
 - Do not delete remote IoTDB `data` or `logs` directories unless the user explicitly asks for the setup/test clean restart flow. Before deletion, resolve the absolute paths and verify they are exactly under the supplied IoTDB install directory.
 - Do not hardcode SSH passwords. If key-based SSH is unavailable, ask the user to configure a key or provide an interactive secure method.
