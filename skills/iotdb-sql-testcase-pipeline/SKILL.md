@@ -23,13 +23,13 @@ When the user provides requirement text, a design document, or issue content wit
 
 ## Workflow
 
-1. Collect the requirement text, version directory, target topology (`1C1D` or `3C3D`), target model (`table`, `tree`, or both), optional official documentation links, one cluster access host, SQL-test runner host, SSH key path, remote IoTDB install directory, and SQL-test tool directory. If the user passes the IoTDB directory and SQL-test directory, treat those as the first paths to verify and execute against. For `3C3D`, do not require three host IPs; one reachable cluster node is enough.
+1. Collect the requirement text, version directory, target topology (`1C1D` or `3C3D`), target model (`table`, `tree`, or both), optional official documentation links, local case artifact directory, local pullback artifact directory, one cluster access host, SQL-test runner host, SSH key path, remote IoTDB install directory, and SQL-test tool directory. If the user passes the IoTDB directory and SQL-test directory, treat those as the first paths to verify and execute against. For `3C3D`, do not require three host IPs; one reachable cluster node is enough.
 2. Search the official manual by default:
    - Tree model: `https://www.timecho.com/docs/zh/UserGuide/latest/`
    - Table model: `https://www.timecho.com/docs/zh/UserGuide/latest-Table/`
    - English fallback: `https://www.timecho-global.com/docs/UserGuide/latest/`
    Use the requirement/design/issue keywords plus the model type. If the model is `both` or unclear, search both tree and table manuals. Record the relevant manual sections in the Markdown `需求来源` field and `.run` source comments.
-3. Create or enter a requirement directory named after the requirement item. Put all local artifacts there.
+3. Create or enter the local case artifact directory. If the user does not provide one, create a requirement directory named after the requirement item under the current workspace. Put the Markdown case file, local generated `.run`, wrappers, and `execution-report.md` there. Create or enter the local pullback artifact directory for files copied back from SQL-test; default it to `<local case artifact directory>/artifacts`.
 4. Verify the remote directories before generation/deployment:
    - IoTDB directory contains expected `conf/` and `sbin/` files.
    - SQL-test directory contains `test.sh`, `user/CONFIG/otf_new.properties`, `user/scripts/`, and `user/result/`.
@@ -48,14 +48,14 @@ When the user provides requirement text, a design document, or issue content wit
    - Table model uses `jdbc:iotdb://<rpc_address>:6667?version=V_1_0&sql_dialect=table`.
    - Tree model uses exactly `jdbc:iotdb://<rpc_address>:6667`; remove `?version=...` and any other query parameters.
 10. Configure `user/CONFIG/special_query.csv` before setup mode when generated cases contain known volatile result columns such as time, query IDs, elapsed time, region IDs, build info, usage, or other environment-dependent columns. Back up the CSV first, then add `SQL;ColumnName;ColumnName` entries that exactly match the query text used in `.run`.
-11. Deploy automation artifacts to the target SQL-test directory using SSH key authentication or an existing secure runtime configuration.
+11. Deploy the executable `.run` to the target SQL-test directory using SSH key authentication or an existing secure runtime configuration. The `.run` that SQL-test executes must be under `<SQL_TEST_DIR>/user/scripts/<feature>/<case-name>.run`.
 12. Execute the two-phase automation flow when the user asks for full execution:
    - Set SQL-test mode to `setup`, execute, and collect `.result` artifacts.
    - Stop IoTDB on the supplied `1C1D` host or supplied `3C3D` cluster access host.
    - Clean only the verified IoTDB `data/` and `logs/` directories.
    - Restart IoTDB, re-check RPC port `6667`, set SQL-test mode to `test`, execute again, and collect `.out`, `result.xml`, and logs.
 13. If the test run exits nonzero, `result.xml` reports failures, or `.out` contains `###### COMPARE RESULT : FAIL ######`, automatically pair the relevant `.result` and `.out` files and run `scripts/suggest_special_query_masks.py`. State the exact SQL and differing result columns, then ask only for the user's decision: re-run comparison, or append/merge suggested mask columns into `special_query.csv`.
-14. Pull back `.result`, `.out`, `result.xml`, logs, wrapper output, `special_query.csv`, and any exported data summaries needed for validation.
+14. Pull back the deployed `.run`, `.result`, `.out`, `result.xml`, logs, wrapper output, `special_query.csv`, and any exported data summaries needed for validation into the local pullback artifact directory.
 15. Fill `execution-report.md` using the fixed template. Include only metrics, paths, conclusion, failure rows, notes, and screenshots/evidence images.
 
 ## Remote Defaults
@@ -68,6 +68,8 @@ When the user does not provide a different environment, use the repository memor
 - SQL automation host: user-provided SQL-test runner host.
 - Common 1C1D topology: one host running both ConfigNode and DataNode.
 - Common 3C3D topology: provide any one reachable cluster node; do not require three IPs.
+- Local case artifact directory: user-provided path, or `<current workspace>/<requirement-item>/`.
+- Local pullback artifact directory: user-provided path, or `<local case artifact directory>/artifacts/`.
 - SQL automation root: `/data/iotdb-sql-test-master`
 - Script upload path: `/data/iotdb-sql-test-master/user/scripts/<feature>/<case-name>.run`
 
@@ -96,6 +98,7 @@ After running the pipeline, respond concisely with:
 - Local Markdown case path.
 - Local automation file path.
 - Remote deployed path.
+- Local pullback artifact directory.
 - Execution host and command.
 - Result summary: total, passed, failed, blocked, not run, conclusion.
 - Local report path and screenshot paths.
