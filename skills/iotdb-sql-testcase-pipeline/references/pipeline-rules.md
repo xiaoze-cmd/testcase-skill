@@ -35,6 +35,7 @@ Rules:
 
 - If the user provides local directories, use those exact directories and create them when missing.
 - If the user does not provide local directories, create `<current workspace>/<requirement-item>/` and `<current workspace>/<requirement-item>/artifacts/`.
+- If `Model` is `both`, create separate model subdirectories: `<local case artifact directory>/tree/`, `<local case artifact directory>/table/`, `<local pullback artifact directory>/tree/`, and `<local pullback artifact directory>/table/`.
 - Do not write generated cases into the skill repository unless the user explicitly chooses that repository as the local case artifact directory.
 - Do not treat the local generated `.run` as executed until it has been deployed to SQL-test.
 - After execution, pull the remote `.run` back with the result artifacts so the report records the exact script that ran.
@@ -184,6 +185,8 @@ For command-line tools such as `export-data.sh`, generate an executable wrapper 
 
 Tree and table models use different SQL-test and SQL rules.
 
+When `Model` is `both`, split the work into two independent model pipelines. Generate separate Markdown case files, separate `.run` files, separate remote script paths, separate pullback artifact directories, and separate reports or report sections for tree and table. Do not mix tree and table SQL in one `.run`, and do not execute both models with one `otf_new.properties` configuration.
+
 ### Table Model
 
 - `otf_new.properties` must connect with table dialect:
@@ -210,6 +213,26 @@ iotdbURL=jdbc:iotdb://<rpc_address>:6667
 - `.run` must not use `use <database>;`.
 - Use full paths such as `root.test.d1.s1`.
 - `create database` must not use table-model assumptions.
+
+### Both Models
+
+For requirements that are common to both tree and table models:
+
+- Generate `tree/<case-name>-tree-cases.md` and `tree/<case-name>-tree.run`.
+- Generate `table/<case-name>-table-cases.md` and `table/<case-name>-table.run`.
+- Deploy the tree `.run` and table `.run` to distinct SQL-test script paths, for example:
+
+```text
+<SQL_TEST_DIR>/user/scripts/<feature>/tree/<case-name>-tree.run
+<SQL_TEST_DIR>/user/scripts/<feature>/table/<case-name>-table.run
+```
+
+- Configure SQL-test as tree model only while executing the tree `.run`.
+- Configure SQL-test as table model only while executing the table `.run`.
+- Run full isolation per model: setup, stop IoTDB, clean verified `data/` and `logs/`, restart, test.
+- Execute SQL-test four times total: tree setup, tree test, table setup, table test.
+- Keep `.result`, `.out`, `result.xml`, logs, and `special_query.csv` pullbacks separated by model.
+- If tree and table expected behavior differs, document the difference in each model's Markdown `预期结果` and `.run` source comments.
 
 ## RPC Address And SQL-test URL Sync
 
@@ -312,6 +335,8 @@ For `1C1D`, run start/stop on the single IoTDB host. For `3C3D`, run start/stop 
 
 For full automated execution, use the two-phase sequence below to avoid dirty data causing `.result` and `.out` differences.
 
+If `Model` is `both`, run the full sequence once for tree and once for table, with SQL-test configuration switched between models. Do not skip the clean restart between the tree setup/test pair or the table setup/test pair.
+
 1. Generate Markdown cases.
 2. Generate `.run` automatically from the checked Markdown.
 3. Lint Markdown and `.run`.
@@ -346,7 +371,7 @@ rm -rf "$IOTDB_DIR/data" "$IOTDB_DIR/logs"
 14. Re-check process and RPC port `6667`.
 15. Set SQL-test execution mode to `test`.
 16. Run `./test.sh` again.
-17. Pull back the remote executed `.run`, `.out`, `result.xml`, test logs, `special_query.csv`, and any updated `.result` references needed for diagnosis into the local pullback artifact directory.
+17. Pull back the remote executed `.run`, `.out`, `result.xml`, test logs, `special_query.csv`, and any updated `.result` references needed for diagnosis into the local pullback artifact directory. For `both`, use the model-specific pullback directory.
 18. If the test command exits nonzero, `result.xml` reports failures, or any `.out` contains `###### COMPARE RESULT : FAIL ######`, automatically run the result masking analysis described below. Do not ask the user to trigger the diff script with another prompt.
 19. Compare case counts and failures before reporting.
 

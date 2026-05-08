@@ -29,7 +29,7 @@ When the user provides requirement text, a design document, or issue content wit
    - Table model: `https://www.timecho.com/docs/zh/UserGuide/latest-Table/`
    - English fallback: `https://www.timecho-global.com/docs/UserGuide/latest/`
    Use the requirement/design/issue keywords plus the model type. If the model is `both` or unclear, search both tree and table manuals. Record the relevant manual sections in the Markdown `需求来源` field and `.run` source comments.
-3. Create or enter the local case artifact directory. If the user does not provide one, create a requirement directory named after the requirement item under the current workspace. Put the Markdown case file, local generated `.run`, wrappers, and `execution-report.md` there. Create or enter the local pullback artifact directory for files copied back from SQL-test; default it to `<local case artifact directory>/artifacts`.
+3. Create or enter the local case artifact directory. If the user does not provide one, create a requirement directory named after the requirement item under the current workspace. Put the Markdown case file, local generated `.run`, wrappers, and `execution-report.md` there. Create or enter the local pullback artifact directory for files copied back from SQL-test; default it to `<local case artifact directory>/artifacts`. When the target model is `both`, split local artifacts into separate `tree/` and `table/` subdirectories and generate separate Markdown, `.run`, pullback artifacts, and reports for each model.
 4. Verify the remote directories before generation/deployment:
    - IoTDB directory contains expected `conf/` and `sbin/` files.
    - SQL-test directory contains `test.sh`, `user/CONFIG/otf_new.properties`, `user/scripts/`, and `user/result/`.
@@ -38,6 +38,7 @@ When the user provides requirement text, a design document, or issue content wit
 6. Generate the automation artifact that matches the target:
    - `.run` for SQL automation tool flows.
    - Shell/PowerShell wrapper when the tested behavior is a tool command such as `export-data.sh`.
+   - For model `both`, generate two `.run` files, one for tree model and one for table model. Do not mix tree and table SQL in one `.run`.
 7. Run static checks:
    - Markdown table has the required columns.
    - Every automated case has setup, execution, assertions, cleanup, and stable expected output.
@@ -54,6 +55,7 @@ When the user provides requirement text, a design document, or issue content wit
    - Stop IoTDB on the supplied `1C1D` host or supplied `3C3D` cluster access host.
    - Clean only the verified IoTDB `data/` and `logs/` directories.
    - Restart IoTDB, re-check RPC port `6667`, set SQL-test mode to `test`, execute again, and collect `.out`, `result.xml`, and logs.
+   - For model `both`, run this full two-phase flow separately for tree and table: tree `setup`, clean/restart, tree `test`, then reconfigure SQL-test for table, table `setup`, clean/restart, table `test`. This means four SQL-test executions total.
 13. If the test run exits nonzero, `result.xml` reports failures, or `.out` contains `###### COMPARE RESULT : FAIL ######`, automatically pair the relevant `.result` and `.out` files and run `scripts/suggest_special_query_masks.py`. State the exact SQL and differing result columns, then ask only for the user's decision: re-run comparison, or append/merge suggested mask columns into `special_query.csv`.
 14. Pull back the deployed `.run`, `.result`, `.out`, `result.xml`, logs, wrapper output, `special_query.csv`, and any exported data summaries needed for validation into the local pullback artifact directory.
 15. Fill `execution-report.md` using the fixed template. Include only metrics, paths, conclusion, failure rows, notes, and screenshots/evidence images.
@@ -85,6 +87,7 @@ Treat these as defaults, not facts. Verify active paths and configs on the remot
 - For table model cases, create a database and `use <database>` after connecting; after switching users, run `use <database>` again.
 - For tree model cases, do not use `use`; use full paths such as `root.test.d1.s1`.
 - For SQL-test config, table and tree model are different. Table mode must use `sql_dialect=table`; tree mode must remove everything after port `6667` from `iotdbURL`.
+- For model `both`, generate and execute separate tree and table artifacts. Do not run one mixed `.run`, do not reuse one SQL-test config, and do not let one model's `.result` become the other model's baseline.
 - Keep DataNode `dn_rpc_address` and SQL-test `iotdbURL` synchronized. The RPC port is fixed to `6667`; SQL-test should connect to `jdbc:iotdb://<dn_rpc_address>:6667...` for table mode and exactly `jdbc:iotdb://<dn_rpc_address>:6667` for tree mode.
 - Use `special_query.csv` for column-level result masking when only some output columns are unstable. Do not replace a deterministic query with `<<CHECKCODE;` just to hide one volatile column.
 - When `###### COMPARE RESULT : FAIL ######` appears, automatically compare `.result` and `.out` with `scripts/suggest_special_query_masks.py`; do not ask the user to provide a new prompt for the diff helper. List the exact SQL and real differing result-table columns, then offer two choices: re-run comparison, or append/merge the suggested mask columns into `special_query.csv`. Ignore SQL-test status/footer differences such as `Elapsed Time`; they are not `special_query.csv` columns.
