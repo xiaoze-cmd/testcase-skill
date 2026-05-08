@@ -34,13 +34,13 @@ Copy-Item -Recurse .\testcase-skill\skills\iotdb-sql-testcase-pipeline $env:USER
 
 ## 使用方式
 
-推荐显式触发：
+如果想强制指定使用这个 skill，可以显式触发：
 
 ```text
 Use $iotdb-sql-testcase-pipeline.
 ```
 
-也可以通过描述 IoTDB/TimechoDB SQL 用例生成、`.run` 生成、1C1D/3C3D 执行、树模型/表模型配置、setup/test 执行、报告生成等任务来隐式触发。只要提供需求、设计文档或 issue 内容，Codex 会默认去官方用户手册检索相关章节；官网链接是可选补充。
+日常使用不需要写 `Use $iotdb-sql-testcase-pipeline.`。直接描述 IoTDB/TimechoDB SQL 用例生成、`.run` 生成、1C1D/3C3D 执行、树模型/表模型配置、setup/test 执行、报告生成等任务即可隐式触发。只要提供需求、设计文档或 issue 内容，Codex 会默认去官方用户手册检索相关章节；官网链接是可选补充。
 
 ## 必填信息
 
@@ -152,7 +152,6 @@ select * from root.**;Time;
 复制下面的 prompt，并替换尖括号里的内容：
 
 ```text
-Use $iotdb-sql-testcase-pipeline.
 请在 1C1D 环境执行 IoTDB/TimechoDB SQL 用例自动化完整流水线。
 
 执行要求：
@@ -187,7 +186,6 @@ SQL-test 工具目录：<远端 /data/iotdb-sql-test-master 等目录>
 复制下面的 prompt，并替换尖括号里的内容：
 
 ```text
-Use $iotdb-sql-testcase-pipeline.
 请在 3C3D 环境执行 IoTDB/TimechoDB SQL 用例自动化完整流水线。
 
 执行要求：
@@ -223,7 +221,6 @@ SQL-test 工具目录：<远端 /data/iotdb-sql-test-master 等目录>
 如果暂时不执行远端环境，只想生成文件：
 
 ```text
-Use $iotdb-sql-testcase-pipeline.
 根据下面的 IoTDB/TimechoDB 需求生成详细 Markdown 表格形式 SQL 用例文件。
 不需要我提供官网链接；请根据模型类型默认检索官方用户手册相关章节，并把引用到的章节写入 Markdown 的需求来源和 .run 的来源注释。
 Markdown 静态检查通过后，继续自动生成 .run 文件。
