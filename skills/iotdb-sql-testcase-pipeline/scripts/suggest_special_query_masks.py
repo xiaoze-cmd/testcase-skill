@@ -56,6 +56,13 @@ class Table:
     rows: list[list[str]]
 
 
+@dataclass
+class Suggestion:
+    sql: str
+    columns: list[str]
+    row: str
+
+
 def normalize_key(value: str) -> str:
     return value.strip().lower()
 
@@ -165,6 +172,53 @@ def compare_tables(result: Table, output: Table) -> tuple[set[str], list[str]]:
     return differing_columns, notes
 
 
+def parse_special_query_row(row: str) -> tuple[str, list[str]]:
+    parts = [part.strip() for part in row.rstrip("\n").split(";")]
+    while parts and parts[-1] == "":
+        parts.pop()
+    if not parts:
+        return "", []
+    return parts[0], [part for part in parts[1:] if part]
+
+
+def merge_special_query(path: Path, suggestions: list[Suggestion]) -> list[str]:
+    existing_lines: list[str] = []
+    if path.exists():
+        existing_lines = path.read_text(encoding="utf-8-sig", errors="replace").splitlines()
+
+    index: dict[str, tuple[int, str, list[str]]] = {}
+    for idx, line in enumerate(existing_lines):
+        sql, columns = parse_special_query_row(line)
+        if sql:
+            index[normalize_key(sql)] = (idx, sql, columns)
+
+    changes: list[str] = []
+    for suggestion in suggestions:
+        key = normalize_key(suggestion.sql)
+        if key in index:
+            idx, sql, columns = index[key]
+            seen = {normalize_col(column) for column in columns}
+            added = [column for column in suggestion.columns if normalize_col(column) not in seen]
+            if not added:
+                changes.append(f"unchanged: {suggestion.sql}")
+                continue
+            merged = columns + added
+            existing_lines[idx] = sql + ";" + ";".join(merged) + ";"
+            index[key] = (idx, sql, merged)
+            changes.append(f"updated: {suggestion.sql}; added {', '.join(added)}")
+        else:
+            existing_lines.append(suggestion.row)
+            index[key] = (len(existing_lines) - 1, suggestion.sql, suggestion.columns)
+            changes.append(f"added: {suggestion.row}")
+
+    content = "\n".join(existing_lines)
+    if content:
+        content += "\n"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content, encoding="utf-8")
+    return changes
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="List SQL-test .result/.out differing columns and suggest special_query.csv rows."
@@ -176,12 +230,20 @@ def main() -> int:
         action="store_true",
         help="Suggest all differing columns. By default only known volatile columns are suggested.",
     )
+    parser.add_argument("--special-query", help="Path to user/CONFIG/special_query.csv")
+    parser.add_argument(
+        "--append",
+        action="store_true",
+        help="Append or merge suggested mask columns into --special-query. Use only after confirming masking is desired.",
+    )
     args = parser.parse_args()
+    if args.append and not args.special_query:
+        parser.error("--append requires --special-query")
 
     result_blocks = {(normalize_key(b.sql), b.occurrence): b for b in split_blocks(Path(args.result))}
     out_blocks = {(normalize_key(b.sql), b.occurrence): b for b in split_blocks(Path(args.out))}
 
-    suggestions: list[str] = []
+    suggestions: list[Suggestion] = []
     printed_any = False
     for key in sorted(set(result_blocks) & set(out_blocks)):
         result_block = result_blocks[key]
@@ -211,15 +273,34 @@ def main() -> int:
                 mask_cols = volatile
             if mask_cols:
                 row = result_block.sql + ";" + ";".join(mask_cols) + ";"
-                suggestions.append(row)
+                suggestions.append(Suggestion(result_block.sql, mask_cols, row))
                 print("  Suggested special_query.csv row: " + row)
             else:
                 print("  No automatic mask suggestion; differing columns look business-related.")
 
     if suggestions:
         print("\nSuggested special_query.csv additions:")
-        for row in suggestions:
-            print(row)
+        for suggestion in suggestions:
+            print(suggestion.row)
+        print("\nNext choices:")
+        print("1. Re-run comparison after another test execution if the differences may be environmental noise.")
+        if args.special_query:
+            append_cmd = (
+                f"python {Path(__file__).name} --result {args.result} --out {args.out} "
+                f"--special-query {args.special_query} --append"
+            )
+            if args.include_business_columns:
+                append_cmd += " --include-business-columns"
+            print("2. Append/merge the suggested mask columns into special_query.csv:")
+            print("   " + append_cmd)
+        else:
+            print("2. Append/merge the suggested mask columns into special_query.csv after confirming them.")
+            print("   Re-run this script with --special-query <path> --append.")
+        if args.append:
+            changes = merge_special_query(Path(args.special_query), suggestions)
+            print("\nApplied special_query.csv changes:")
+            for change in changes:
+                print("- " + change)
     elif not printed_any:
         print("No comparable result table differences found. Tool status lines such as Elapsed Time are ignored.")
     else:
