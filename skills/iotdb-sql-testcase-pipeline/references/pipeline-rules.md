@@ -11,6 +11,8 @@ Collect these before execution. If the user already provides the IoTDB install d
 | Topology | Yes | `1C1D` or `3C3D`. |
 | Model | Yes | `table`, `tree`, or both. |
 | Source docs | Yes | Requirement/design docs or issue text. Official docs URLs are optional because the skill searches official manuals by default. |
+| Local case artifact directory | Yes | Stores the generated Markdown cases, local generated `.run`, wrappers, and `execution-report.md`. If omitted, use `<current workspace>/<requirement-item>/`. |
+| Local pullback artifact directory | Yes | Stores files pulled back from SQL-test after execution. If omitted, use `<local case artifact directory>/artifacts/`. |
 | Cluster access host | Yes | One host is enough for both `1C1D` and `3C3D`; for `3C3D`, use any reachable cluster node. |
 | SQL-test runner host | Yes | May be the same as the cluster access host. |
 | SSH identity | Yes | Use `IOTDB_SSH_KEY` or a local private key path; never write passwords. |
@@ -18,6 +20,24 @@ Collect these before execution. If the user already provides the IoTDB install d
 | SQL-test tool path | Yes | User may pass it directly. Verify `test.sh` and `user/CONFIG/otf_new.properties`. |
 
 If a requested detail can be discovered safely from local files or the remote server, discover it instead of stopping.
+
+## Local Artifact Layout
+
+Keep local generation and remote execution paths separate.
+
+| Path | Contents |
+|------|----------|
+| Local case artifact directory | Markdown case file, local generated `.run`, wrapper scripts, command inventory, `execution-report.md`, notes. |
+| Remote SQL-test script path | The executable `.run` deployed under `<SQL_TEST_DIR>/user/scripts/<feature>/<case-name>.run`. SQL-test must run this remote copy. |
+| Local pullback artifact directory | Deployed `.run` copied back from SQL-test, `.result`, `.out`, `result.xml`, logs, `special_query.csv`, screenshots, exported-data summaries. |
+
+Rules:
+
+- If the user provides local directories, use those exact directories and create them when missing.
+- If the user does not provide local directories, create `<current workspace>/<requirement-item>/` and `<current workspace>/<requirement-item>/artifacts/`.
+- Do not write generated cases into the skill repository unless the user explicitly chooses that repository as the local case artifact directory.
+- Do not treat the local generated `.run` as executed until it has been deployed to SQL-test.
+- After execution, pull the remote `.run` back with the result artifacts so the report records the exact script that ran.
 
 ## Official Manual Lookup
 
@@ -79,7 +99,7 @@ Do not silently fall back to stale remembered paths when the user supplied expli
 
 ## Markdown Case Requirements
 
-Generate Markdown first from the user material plus the official manual lookup. The normal full pipeline is automatic: create the Markdown table, self-review and lint it, then generate `.run` without waiting for a separate manual review unless the user requested Markdown-only or review-only mode.
+Generate Markdown first from the user material plus the official manual lookup. Save it under the local case artifact directory. The normal full pipeline is automatic: create the Markdown table, self-review and lint it, then generate `.run` without waiting for a separate manual review unless the user requested Markdown-only or review-only mode.
 
 Use a Markdown table. The minimum required columns are:
 
@@ -106,7 +126,7 @@ Performance cases must not be simplified. Include data scale, generation method,
 
 ## Automation File Rules
 
-Generate `.run` automatically after the Markdown table passes static checks.
+Generate `.run` automatically under the local case artifact directory after the Markdown table passes static checks. Deploy the executable copy to the remote SQL-test script path before execution.
 
 `.run` case pattern:
 
@@ -254,6 +274,13 @@ Upload convention:
 <SQL_TEST_DIR>/user/scripts/<feature>/<case-name>.run
 ```
 
+After deployment, record both paths:
+
+```text
+local generated .run: <local case artifact directory>/<case-name>.run
+remote executed .run: <SQL_TEST_DIR>/user/scripts/<feature>/<case-name>.run
+```
+
 ## Cluster Start/Stop
 
 Always perform read-only checks first:
@@ -319,7 +346,7 @@ rm -rf "$IOTDB_DIR/data" "$IOTDB_DIR/logs"
 14. Re-check process and RPC port `6667`.
 15. Set SQL-test execution mode to `test`.
 16. Run `./test.sh` again.
-17. Pull back `.out`, `result.xml`, test logs, `special_query.csv`, and any updated `.result` references needed for diagnosis.
+17. Pull back the remote executed `.run`, `.out`, `result.xml`, test logs, `special_query.csv`, and any updated `.result` references needed for diagnosis into the local pullback artifact directory.
 18. If the test command exits nonzero, `result.xml` reports failures, or any `.out` contains `###### COMPARE RESULT : FAIL ######`, automatically run the result masking analysis described below. Do not ask the user to trigger the diff script with another prompt.
 19. Compare case counts and failures before reporting.
 
@@ -393,6 +420,7 @@ Do not claim all cases passed unless:
 Pull back these artifacts when present:
 
 ```text
+*.run
 *.result
 *.out
 result.xml
@@ -404,7 +432,7 @@ export directories or validation summaries
 
 ## Fixed Report
 
-Create `execution-report.md` in the requirement directory. Use `assets/test-execution-report-template.md` or `scripts/build_execution_report.py`.
+Create `execution-report.md` in the local case artifact directory. Use `assets/test-execution-report-template.md` or `scripts/build_execution_report.py`.
 
 Reports must stay short. Fill only:
 

@@ -11,6 +11,7 @@
 - 默认根据需求、设计文档或 issue 去官方用户手册检索相关章节，不要求用户额外提供官网链接
 - 先生成详细 Markdown 表格形式用例文件
 - Markdown 静态检查通过后，自动生成 `.run` 文件
+- 按用户指定的本地目录保存 Markdown 用例和本地生成的 `.run`
 - 根据用户传入的 IoTDB 安装目录和 SQL-test 工具目录做远端检查
 - 支持 `1C1D` 和 `3C3D` 两种执行拓扑
 - 支持树模型和表模型，两者配置不同
@@ -19,6 +20,7 @@
 - 先跑 `setup` 模式生成 `.result`
 - 重启并清理 IoTDB `data`、`logs` 后，再跑 `test` 模式生成 `.out`
 - 如果执行后出现 `COMPARE RESULT : FAIL`，自动对比 `.result` 和 `.out` 并列出差异列
+- 执行完成后把远端 `.run`、`.result`、`.out`、`result.xml`、日志等拉回到用户指定的本地目录
 - 拉回 `.result`、`.out`、`result.xml`、日志、截图，并生成固定格式执行报告
 
 ## 安装方式
@@ -50,6 +52,8 @@ Use $iotdb-sql-testcase-pipeline.
 |------|------|
 | 执行拓扑 | `1C1D` 或 `3C3D` |
 | 模型类型 | `tree` 或 `table` |
+| 本地用例文件目录 | `<本地保存 Markdown 用例和本地 .run 的目录>` |
+| 本地拉回产物目录 | `<本地保存远端 .run、.result、.out、result.xml、日志等产物的目录>` |
 | IoTDB 安装目录 | `/data/iotdb-enterprise-xxx/iotdb-enterprise-xxx-bin` |
 | SQL-test 工具目录 | `/data/iotdb-sql-test-master` |
 | SQL-test 执行主机 | `<SQL-test 所在主机 IP>` |
@@ -60,6 +64,23 @@ Use $iotdb-sql-testcase-pipeline.
 
 Codex 会先验证传入的 IoTDB 目录和 SQL-test 目录，再执行后续操作；不会优先使用旧记忆里的路径覆盖用户传入的路径。
 针对 `3C3D` 集群测试，只需要提供集群中的任意一个节点 IP，不需要提供三台主机 IP。
+
+## 本地产物目录
+
+建议在 prompt 里明确指定两个本地目录：
+
+| 目录 | 存放内容 |
+|------|----------|
+| 本地用例文件目录 | Markdown 用例、本地生成的 `.run`、包装脚本、命令清单、`execution-report.md` |
+| 本地拉回产物目录 | 从 SQL-test 拉回的远端 `.run`、`.result`、`.out`、`result.xml`、日志、`special_query.csv`、截图 |
+
+`.run` 的执行位置固定在远端 SQL-test 工具目录下，例如：
+
+```text
+<SQL-test 工具目录>/user/scripts/<feature>/<case-name>.run
+```
+
+也就是说：先在本地用例文件目录生成 Markdown 和 `.run`，再把 `.run` 部署到 SQL-test 目录执行，执行完后再把远端实际执行的 `.run` 和结果文件一起拉回本地拉回产物目录。
 
 ## 默认检索官方用户手册
 
@@ -157,19 +178,23 @@ select * from root.**;Time;
 执行要求：
 1. 先根据需求生成详细 Markdown 表格形式用例文件。
 2. 不需要我提供官网链接；请根据模型类型默认检索官方用户手册相关章节，并把引用到的章节写入 Markdown 的需求来源和 .run 的来源注释。
-3. Markdown 静态检查通过后，自动生成 .run 文件，不要停在 Markdown 阶段。
-4. 使用我传入的 IoTDB 安装目录和 SQL-test 工具目录，先检查目录是否存在、配置是否正确，再执行操作。
-5. 根据模型类型配置 SQL-test：表模型需要 sql_dialect=table，树模型不能保留 sql_dialect=table。
-6. 读取 IoTDB 的 dn_rpc_address；SQL-test 的 iotdbURL 要同步成相同 IP，端口固定为 6667。
-7. 检查是否存在时间、任务 ID、耗时、节点地址等不稳定列；如有，先备份并更新 user/CONFIG/special_query.csv。
-8. 先把 SQL-test 改成 setup 模式并执行，生成 .result。
-9. setup 执行完成后，停止 IoTDB，删除 IoTDB 安装目录下的 data 和 logs，再启动 IoTDB。
-10. 再把 SQL-test 改成 test 模式执行，生成 .out 并对比 result.xml。
-11. 如果发现 COMPARE RESULT : FAIL 或 result.xml 失败，自动对比对应 .result/.out，列出具体 SQL 和差异列，只让我选择“再次运行比对”或“追加屏蔽列到 special_query.csv”。
-12. 拉回 .result、.out、result.xml、special_query.csv、日志和截图，生成 execution-report.md。
+3. Markdown 和本地生成的 .run 保存到“本地用例文件目录”。
+4. Markdown 静态检查通过后，自动生成 .run 文件，不要停在 Markdown 阶段。
+5. 把 .run 部署到 SQL-test 工具目录下的 user/scripts/<feature>/ 目录执行；执行完后把远端实际执行的 .run 再拉回本地拉回产物目录。
+6. 使用我传入的 IoTDB 安装目录和 SQL-test 工具目录，先检查目录是否存在、配置是否正确，再执行操作。
+7. 根据模型类型配置 SQL-test：表模型需要 sql_dialect=table，树模型不能保留 sql_dialect=table。
+8. 读取 IoTDB 的 dn_rpc_address；SQL-test 的 iotdbURL 要同步成相同 IP，端口固定为 6667。
+9. 检查是否存在时间、任务 ID、耗时、节点地址等不稳定列；如有，先备份并更新 user/CONFIG/special_query.csv。
+10. 先把 SQL-test 改成 setup 模式并执行，生成 .result。
+11. setup 执行完成后，停止 IoTDB，删除 IoTDB 安装目录下的 data 和 logs，再启动 IoTDB。
+12. 再把 SQL-test 改成 test 模式执行，生成 .out 并对比 result.xml。
+13. 如果发现 COMPARE RESULT : FAIL 或 result.xml 失败，自动对比对应 .result/.out，列出具体 SQL 和差异列，只让我选择“再次运行比对”或“追加屏蔽列到 special_query.csv”。
+14. 拉回远端 .run、.result、.out、result.xml、special_query.csv、日志和截图到“本地拉回产物目录”，生成 execution-report.md。
 
 拓扑：1C1D
 模型类型：<tree 或 table>
+本地用例文件目录：<本地保存 Markdown 用例和本地 .run 的目录>
+本地拉回产物目录：<本地保存远端 .run、.result、.out、result.xml、日志等产物的目录>
 1C1D 主机：<主机 IP>
 SQL-test 执行主机：<主机 IP>
 SSH 用户：<ubuntu 或其他用户>
@@ -191,20 +216,24 @@ SQL-test 工具目录：<远端 /data/iotdb-sql-test-master 等目录>
 执行要求：
 1. 先根据需求生成详细 Markdown 表格形式用例文件。
 2. 不需要我提供官网链接；请根据模型类型默认检索官方用户手册相关章节，并把引用到的章节写入 Markdown 的需求来源和 .run 的来源注释。
-3. Markdown 静态检查通过后，自动生成 .run 文件，不要停在 Markdown 阶段。
-4. 使用我传入的 IoTDB 安装目录和 SQL-test 工具目录，先检查该集群节点上的目录是否存在、配置是否正确，再执行操作。
-5. 根据模型类型配置 SQL-test：表模型需要 sql_dialect=table，树模型不能保留 sql_dialect=table。
-6. 读取该节点配置中的 dn_rpc_address；SQL-test 的 iotdbURL 要同步成相同 IP，端口固定为 6667。
-7. SQL-test 可以在指定执行主机上跑，但 iotdbURL 必须指向配置文件里的 dn_rpc_address，不要默认等同于 SQL-test 执行主机。
-8. 检查是否存在时间、任务 ID、耗时、节点地址等不稳定列；如有，先备份并更新 user/CONFIG/special_query.csv。
-9. 先把 SQL-test 改成 setup 模式并执行，生成 .result。
-10. setup 执行完成后，停止该集群节点上的 IoTDB，删除该 IoTDB 安装目录下的 data 和 logs，再启动 IoTDB。
-11. 再把 SQL-test 改成 test 模式执行，生成 .out 并对比 result.xml。
-12. 如果发现 COMPARE RESULT : FAIL 或 result.xml 失败，自动对比对应 .result/.out，列出具体 SQL 和差异列，只让我选择“再次运行比对”或“追加屏蔽列到 special_query.csv”。
-13. 拉回 .result、.out、result.xml、special_query.csv、日志和截图，生成 execution-report.md。
+3. Markdown 和本地生成的 .run 保存到“本地用例文件目录”。
+4. Markdown 静态检查通过后，自动生成 .run 文件，不要停在 Markdown 阶段。
+5. 把 .run 部署到 SQL-test 工具目录下的 user/scripts/<feature>/ 目录执行；执行完后把远端实际执行的 .run 再拉回本地拉回产物目录。
+6. 使用我传入的 IoTDB 安装目录和 SQL-test 工具目录，先检查该集群节点上的目录是否存在、配置是否正确，再执行操作。
+7. 根据模型类型配置 SQL-test：表模型需要 sql_dialect=table，树模型不能保留 sql_dialect=table。
+8. 读取该节点配置中的 dn_rpc_address；SQL-test 的 iotdbURL 要同步成相同 IP，端口固定为 6667。
+9. SQL-test 可以在指定执行主机上跑，但 iotdbURL 必须指向配置文件里的 dn_rpc_address，不要默认等同于 SQL-test 执行主机。
+10. 检查是否存在时间、任务 ID、耗时、节点地址等不稳定列；如有，先备份并更新 user/CONFIG/special_query.csv。
+11. 先把 SQL-test 改成 setup 模式并执行，生成 .result。
+12. setup 执行完成后，停止该集群节点上的 IoTDB，删除该 IoTDB 安装目录下的 data 和 logs，再启动 IoTDB。
+13. 再把 SQL-test 改成 test 模式执行，生成 .out 并对比 result.xml。
+14. 如果发现 COMPARE RESULT : FAIL 或 result.xml 失败，自动对比对应 .result/.out，列出具体 SQL 和差异列，只让我选择“再次运行比对”或“追加屏蔽列到 special_query.csv”。
+15. 拉回远端 .run、.result、.out、result.xml、special_query.csv、日志和截图到“本地拉回产物目录”，生成 execution-report.md。
 
 拓扑：3C3D
 模型类型：<tree 或 table>
+本地用例文件目录：<本地保存 Markdown 用例和本地 .run 的目录>
+本地拉回产物目录：<本地保存远端 .run、.result、.out、result.xml、日志等产物的目录>
 3C3D 集群节点：<集群任意一个节点 IP>
 SQL-test 执行主机：<主机 IP>
 SSH 用户：<ubuntu 或其他用户>
@@ -227,6 +256,7 @@ Markdown 静态检查通过后，继续自动生成 .run 文件。
 先不要部署和执行远端环境。
 
 模型类型：<tree 或 table>
+本地用例文件目录：<本地保存 Markdown 用例和本地 .run 的目录>
 
 需求：
 <粘贴需求、设计文档或 issue 内容；官网链接可选>
@@ -248,6 +278,8 @@ skills/
 
 - Markdown 用例是 `.run` 文件的来源，不能跳过。
 - 默认是 Markdown 检查通过后自动生成 `.run`。
+- Markdown 用例和本地生成的 `.run` 放在“本地用例文件目录”；远端实际执行的 `.run` 必须放在 SQL-test 工具目录的 `user/scripts/<feature>/` 下。
+- 执行完成后需要把远端实际执行的 `.run` 和 `.result`、`.out`、`result.xml`、日志等一起拉回“本地拉回产物目录”。
 - 远端执行前必须确认目标主机、IoTDB 安装目录、SQL-test 工具目录、目标 `.run` 文件和 `otf_new.properties`。
 - 树模型和表模型配置不同，不能混用 `sql_dialect=table`。
 - 修改 IoTDB `dn_rpc_address` 后，必须同步 SQL-test `iotdbURL`；端口固定为 `6667`。
