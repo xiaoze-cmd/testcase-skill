@@ -18,6 +18,7 @@
 - 根据需要维护 SQL-test `special_query.csv` 屏蔽文件，用于忽略不稳定结果列
 - 先跑 `setup` 模式生成 `.result`
 - 重启并清理 IoTDB `data`、`logs` 后，再跑 `test` 模式生成 `.out`
+- 如果执行后出现 `COMPARE RESULT : FAIL`，自动对比 `.result` 和 `.out` 并列出差异列
 - 拉回 `.result`、`.out`、`result.xml`、日志、截图，并生成固定格式执行报告
 
 ## 安装方式
@@ -134,24 +135,17 @@ select * from root.**;Time;
 - 如果 SQL 或列名写错，工具通常不会报错，只是屏蔽不生效。
 - 必须在 `setup` 模式执行前配置好，否则 `.result` 和 `.out` 可能不是同一套屏蔽规则。
 - 如果 `test` 后才发现因为某个不稳定列导致对比失败，应更新 `special_query.csv` 后重新执行 `setup -> 清理重启 -> test`。
-- 如果 `.out` 中出现 `###### COMPARE RESULT : FAIL ######`，需要先比较 `.result` 和 `.out` 的真实结果列差异，再决定是否写入 `special_query.csv`。
+- 如果 `.out` 中出现 `###### COMPARE RESULT : FAIL ######`，Codex 会自动比较 `.result` 和 `.out` 的真实结果列差异，再让你选择是否写入 `special_query.csv`。
 - `Elapsed Time: ...` 这种工具耗时行不是结果列，不要写入 `special_query.csv`；但查询结果列里的 `elapsed_time` 可以作为候选屏蔽列。
 
-可以让 Codex 用辅助脚本先列出差异列：
+完整执行流程里，Codex 在 `test.sh` 执行后会检查退出码、`result.xml` 和 `.out`。只要发现 `COMPARE RESULT : FAIL` 或失败用例，就会自动运行 `scripts/suggest_special_query_masks.py`，按用例匹配 `.result` 和 `.out`，列出具体是哪条 SQL 的哪些列在 result/out 中不一致，并忽略 `Elapsed Time`、`COMPARE RESULT : FAIL` 这类工具状态行。
 
-```text
-请使用 scripts/suggest_special_query_masks.py 对比 .result 和 .out，列出真实不同的结果列，并给出建议追加到 special_query.csv 的行。
-注意不要把 Elapsed Time 或 COMPARE RESULT : FAIL 这类工具状态行当作屏蔽列。
-如果检测到可屏蔽差异列，请说明是哪条 SQL 的哪些列在 result/out 中不一致，并给出两个选择：
+分析完成后，用户只需要确认下一步：
+
 1. 再次运行比对。
-2. 追加屏蔽列到 special_query.csv。
-```
+2. 追加/合并屏蔽列到 `special_query.csv`。
 
-用户确认追加后，可以执行：
-
-```text
-python scripts/suggest_special_query_masks.py --result <case.result> --out <case.out> --special-query <SQL-test 工具目录>/user/CONFIG/special_query.csv --append
-```
+只有在用户选择追加后，Codex 才会备份并更新 `special_query.csv`，然后重新执行 `setup -> 清理重启 -> test`，确保 `.result` 和 `.out` 使用同一套屏蔽规则。
 
 ## 1C1D 完整执行 Prompt
 
@@ -172,7 +166,8 @@ Use $iotdb-sql-testcase-pipeline.
 8. 先把 SQL-test 改成 setup 模式并执行，生成 .result。
 9. setup 执行完成后，停止 IoTDB，删除 IoTDB 安装目录下的 data 和 logs，再启动 IoTDB。
 10. 再把 SQL-test 改成 test 模式执行，生成 .out 并对比 result.xml。
-11. 拉回 .result、.out、result.xml、special_query.csv、日志和截图，生成 execution-report.md。
+11. 如果发现 COMPARE RESULT : FAIL 或 result.xml 失败，自动对比对应 .result/.out，列出具体 SQL 和差异列，只让我选择“再次运行比对”或“追加屏蔽列到 special_query.csv”。
+12. 拉回 .result、.out、result.xml、special_query.csv、日志和截图，生成 execution-report.md。
 
 拓扑：1C1D
 模型类型：<tree 或 table>
@@ -207,7 +202,8 @@ Use $iotdb-sql-testcase-pipeline.
 9. 先把 SQL-test 改成 setup 模式并执行，生成 .result。
 10. setup 执行完成后，停止该集群节点上的 IoTDB，删除该 IoTDB 安装目录下的 data 和 logs，再启动 IoTDB。
 11. 再把 SQL-test 改成 test 模式执行，生成 .out 并对比 result.xml。
-12. 拉回 .result、.out、result.xml、special_query.csv、日志和截图，生成 execution-report.md。
+12. 如果发现 COMPARE RESULT : FAIL 或 result.xml 失败，自动对比对应 .result/.out，列出具体 SQL 和差异列，只让我选择“再次运行比对”或“追加屏蔽列到 special_query.csv”。
+13. 拉回 .result、.out、result.xml、special_query.csv、日志和截图，生成 execution-report.md。
 
 拓扑：3C3D
 模型类型：<tree 或 table>

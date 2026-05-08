@@ -320,7 +320,8 @@ rm -rf "$IOTDB_DIR/data" "$IOTDB_DIR/logs"
 15. Set SQL-test execution mode to `test`.
 16. Run `./test.sh` again.
 17. Pull back `.out`, `result.xml`, test logs, `special_query.csv`, and any updated `.result` references needed for diagnosis.
-18. Compare case counts and failures before reporting.
+18. If the test command exits nonzero, `result.xml` reports failures, or any `.out` contains `###### COMPARE RESULT : FAIL ######`, automatically run the result masking analysis described below. Do not ask the user to trigger the diff script with another prompt.
+19. Compare case counts and failures before reporting.
 
 Do not skip the restart and cleanup between setup and test unless the user explicitly requests a faster non-isolated run.
 
@@ -357,24 +358,28 @@ Rules observed from the SQL-test implementation:
 - Do not add SQL-test footer/status lines such as `Elapsed Time` or `###### COMPARE RESULT : FAIL ######` to `special_query.csv`. They are tool output, not query result columns.
 - A query result column named `elapsed_time` may be a valid mask candidate for statements such as `show queries`; the footer line `Elapsed Time: ...` is not.
 
-When SQL-test reports `###### COMPARE RESULT : FAIL ######`, analyze the actual `.result` and `.out` differences before editing the CSV:
+When SQL-test reports `###### COMPARE RESULT : FAIL ######`, automatically analyze the actual `.result` and `.out` differences before editing the CSV. This is part of the execution flow; the user should not need to provide a second prompt just to run the helper.
 
 ```bash
 python scripts/suggest_special_query_masks.py --result path/to/case.result --out path/to/case.out
 ```
 
+Pair files by case basename from the generated artifacts. If multiple cases fail, run the helper for each result/out pair and summarize each failing SQL separately. If a pair is missing, report the missing artifact instead of skipping the analysis silently.
+
 The script lists differing result-table columns and suggests `special_query.csv` rows only for known volatile columns by default. It ignores tool footer/status lines such as `Elapsed Time`. If a difference is in a business column, inspect it manually instead of masking it.
 
-After suggesting mask columns, state the exact SQL and differing columns, then offer two choices:
+After suggesting mask columns, state the exact SQL and differing columns, then stop for only this decision:
 
 1. Re-run comparison after another test execution if the difference may be caused by environment noise.
 2. Append/merge the suggested mask columns into `special_query.csv`.
 
-Only append after the user chooses that option. Use:
+Only append after the user chooses that option. Back up `special_query.csv` first, then use:
 
 ```bash
 python scripts/suggest_special_query_masks.py --result path/to/case.result --out path/to/case.out --special-query "$SQL_TEST_DIR/user/CONFIG/special_query.csv" --append
 ```
+
+After appending mask columns, rerun the isolated setup -> clean/restart -> test sequence so `.result` and `.out` are generated with the same mask rules.
 
 ## Artifact Collection
 

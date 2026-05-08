@@ -18,7 +18,7 @@ When the user provides requirement text, a design document, or issue content wit
 - Read `references/pipeline-rules.md` before generating `.run`, touching remote servers, switching models, restarting IoTDB, executing cases, or writing reports.
 - Use `assets/test-execution-report-template.md` as the fixed report shape.
 - Use `scripts/lint_case_artifacts.py` before deploying generated Markdown/`.run` artifacts when Python is available.
-- Use `scripts/suggest_special_query_masks.py` after SQL-test comparison failures to list `.result`/`.out` differing result columns and produce candidate `special_query.csv` rows.
+- Automatically use `scripts/suggest_special_query_masks.py` after SQL-test comparison failures to list `.result`/`.out` differing result columns and produce candidate `special_query.csv` rows. Do not wait for the user to ask for this helper.
 - Use `scripts/build_execution_report.py` to create a fixed report from execution metrics when the report does not already exist.
 
 ## Workflow
@@ -54,8 +54,9 @@ When the user provides requirement text, a design document, or issue content wit
    - Stop IoTDB on the supplied `1C1D` host or supplied `3C3D` cluster access host.
    - Clean only the verified IoTDB `data/` and `logs/` directories.
    - Restart IoTDB, re-check RPC port `6667`, set SQL-test mode to `test`, execute again, and collect `.out`, `result.xml`, and logs.
-13. Pull back `.result`, `.out`, `result.xml`, logs, wrapper output, `special_query.csv`, and any exported data summaries needed for validation.
-14. Fill `execution-report.md` using the fixed template. Include only metrics, paths, conclusion, failure rows, notes, and screenshots/evidence images.
+13. If the test run exits nonzero, `result.xml` reports failures, or `.out` contains `###### COMPARE RESULT : FAIL ######`, automatically pair the relevant `.result` and `.out` files and run `scripts/suggest_special_query_masks.py`. State the exact SQL and differing result columns, then ask only for the user's decision: re-run comparison, or append/merge suggested mask columns into `special_query.csv`.
+14. Pull back `.result`, `.out`, `result.xml`, logs, wrapper output, `special_query.csv`, and any exported data summaries needed for validation.
+15. Fill `execution-report.md` using the fixed template. Include only metrics, paths, conclusion, failure rows, notes, and screenshots/evidence images.
 
 ## Remote Defaults
 
@@ -84,7 +85,7 @@ Treat these as defaults, not facts. Verify active paths and configs on the remot
 - For SQL-test config, table and tree model are different. Table mode must use `sql_dialect=table`; tree mode must remove everything after port `6667` from `iotdbURL`.
 - Keep DataNode `dn_rpc_address` and SQL-test `iotdbURL` synchronized. The RPC port is fixed to `6667`; SQL-test should connect to `jdbc:iotdb://<dn_rpc_address>:6667...` for table mode and exactly `jdbc:iotdb://<dn_rpc_address>:6667` for tree mode.
 - Use `special_query.csv` for column-level result masking when only some output columns are unstable. Do not replace a deterministic query with `<<CHECKCODE;` just to hide one volatile column.
-- When `###### COMPARE RESULT : FAIL ######` appears, compare `.result` and `.out`, list the exact SQL and real differing result-table columns, then offer two choices: re-run comparison, or append/merge the suggested mask columns into `special_query.csv`. Ignore SQL-test status/footer differences such as `Elapsed Time`; they are not `special_query.csv` columns.
+- When `###### COMPARE RESULT : FAIL ######` appears, automatically compare `.result` and `.out` with `scripts/suggest_special_query_masks.py`; do not ask the user to provide a new prompt for the diff helper. List the exact SQL and real differing result-table columns, then offer two choices: re-run comparison, or append/merge the suggested mask columns into `special_query.csv`. Ignore SQL-test status/footer differences such as `Elapsed Time`; they are not `special_query.csv` columns.
 - Update `special_query.csv` before setup mode so `.result` and `.out` are generated with the same masked columns. If masking is discovered after a mismatch, update the CSV and rerun the full setup -> clean/restart -> test sequence.
 - For performance cases, include data volume, concurrency or loop count, warm-up behavior, measured metric, threshold/baseline rule, cleanup policy, and remote output path.
 
