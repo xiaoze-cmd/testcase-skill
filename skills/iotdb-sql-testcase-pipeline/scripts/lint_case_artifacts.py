@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Lightweight lint for IoTDB SQL testcase Markdown and .run artifacts."""
+"""IoTDB SQL Markdown 用例和 .run 产物轻量检查。"""
 
 from __future__ import annotations
 
@@ -37,7 +37,7 @@ def check_no_secrets(path: Path, text: str) -> list[str]:
     issues = []
     for pat in SECRET_PATTERNS:
         if pat.search(text):
-            issues.append(f"{path}: contains possible secret: {pat.pattern}")
+            issues.append(f"{path}: 可能包含敏感信息：{pat.pattern}")
     return issues
 
 
@@ -47,12 +47,12 @@ def lint_md(path: Path) -> list[str]:
     header_line = next((line for line in text.splitlines() if line.strip().startswith("|") and "用例编号" in line), "")
     for col in REQUIRED_MD_COLUMNS:
         if col not in header_line:
-            issues.append(f"{path}: missing required Markdown column: {col}")
+            issues.append(f"{path}: 缺少必需 Markdown 列：{col}")
     if text.count("| TC-") == 0 and "TC-" not in text:
-        issues.append(f"{path}: no stable TC-* case IDs found")
-    for term in ["setup", "cleanup"]:
-        if term not in text.lower() and {"setup": "清理", "cleanup": "清理"}[term] not in text:
-            issues.append(f"{path}: expected explicit {term} steps")
+        issues.append(f"{path}: 没有找到稳定的 TC-* 用例编号")
+    for term, chinese in [("setup", "准备"), ("cleanup", "清理")]:
+        if term not in text.lower() and chinese not in text:
+            issues.append(f"{path}: 缺少明确的 {term}/{chinese} 步骤")
     return issues
 
 
@@ -68,27 +68,27 @@ def lint_run(path: Path) -> list[str]:
     text = path.read_text(encoding="utf-8-sig")
     issues = check_no_secrets(path, text)
     if "connect " not in text.lower():
-        issues.append(f"{path}: missing connect statement")
+        issues.append(f"{path}: 缺少 connect 语句")
     if not any(marker in text for marker in ["<<NULL;", "<<SQLSTATE;", "<<CHECKCODE;"]):
-        issues.append(f"{path}: missing SQL automation markers")
+        issues.append(f"{path}: 缺少 SQL 自动化标记")
     for idx, case in enumerate(split_run_cases(text), start=1):
         low = case.lower()
         if "drop database" not in low and "drop table" not in low and "delete" not in low:
-            issues.append(f"{path}: case {idx} has no visible cleanup statement")
+            issues.append(f"{path}: 第 {idx} 条用例没有可见清理语句")
         if "select " in low and "order by" not in low and "<<CHECKCODE;" not in case:
-            issues.append(f"{path}: case {idx} query may have unstable output; add ORDER BY or justify CHECKCODE")
+            issues.append(f"{path}: 第 {idx} 条用例查询结果可能不稳定；请添加 ORDER BY 或说明 CHECKCODE 的必要性")
     return issues
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Lint testcase Markdown and .run files")
+    parser = argparse.ArgumentParser(description="检查 Markdown 用例和 .run 文件")
     parser.add_argument("paths", nargs="+")
     args = parser.parse_args()
     issues: list[str] = []
     for raw in args.paths:
         path = Path(raw)
         if not path.exists():
-            issues.append(f"{path}: file does not exist")
+            issues.append(f"{path}: 文件不存在")
             continue
         if path.suffix.lower() == ".md":
             issues.extend(lint_md(path))
@@ -98,7 +98,7 @@ def main() -> int:
         for issue in issues:
             print(issue, file=sys.stderr)
         return 1
-    print("lint passed")
+    print("检查通过")
     return 0
 
 

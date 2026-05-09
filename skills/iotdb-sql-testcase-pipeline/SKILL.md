@@ -13,6 +13,12 @@ Always prefer the current repository's `AGENTS.md` if present. It is the project
 
 When the user provides requirement text, a design document, or issue content without official documentation links, proactively search the official TimechoDB/IoTDB user manual for related behavior, syntax, constraints, and edge cases before generating cases. Treat user-supplied links as optional supplements, not required inputs.
 
+## User-Facing Language
+
+Use Simplified Chinese for all user-facing text during this skill workflow: progress updates, operation steps, execution status, failure analysis, confirmation choices, final summaries, Markdown case prose, `.run` Chinese comments, and `execution-report.md`.
+
+Keep commands, file paths, SQL statements, configuration keys, log excerpts, error codes, filenames, and tool-fixed output in their original form. When summarizing English logs or tool output, explain the meaning in Chinese instead of leaving the surrounding operation/result narrative in English.
+
 ## Required References
 
 - Read `references/pipeline-rules.md` before generating `.run`, touching remote servers, switching models, restarting IoTDB, executing cases, or writing reports.
@@ -97,13 +103,13 @@ Treat these as defaults, not facts. Verify active paths and configs on the remot
 
 ## Final Response Shape
 
-After running the pipeline, respond concisely with:
+After running the pipeline, respond concisely in Chinese with:
 
-- Local Markdown case path.
-- Local automation file path.
-- Remote deployed path.
-- Local pullback artifact directory.
-- Execution host and command.
-- Result summary: total, passed, failed, blocked, not run, conclusion.
-- Local report path and screenshot paths.
-- Any blockers or verification gaps.
+- 本地 Markdown 用例路径。
+- 本地自动化文件路径。
+- 远端部署路径。
+- 本地拉回产物目录。
+- 执行主机和命令。
+- 结果汇总：总数、通过、失败、阻塞、未执行、结论。
+- 本地报告路径和截图路径。
+- 阻塞项或验证缺口。
