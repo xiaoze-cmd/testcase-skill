@@ -1,7 +1,7 @@
 interface:
   display_name: "IoTDB SQL 用例流水线"
   short_description: "生成 SQL 用例、.run，并执行 setup/test"
-  default_prompt: "使用 iotdb-sql-testcase-pipeline：默认检索 TimechoDB/IoTDB 官方用户手册；根据需求、设计文档或 issue 生成详细 Markdown 用例和本地 .run；model=both 时拆分 tree/table 两套目录和 .run；把可执行 .run 部署到 SQL-test 的 user/scripts 目录；校验用户提供的 IoTDB 和 SQL-test 目录；3C3D 必须提供三台节点和可用 SSH key，并在三台节点上完成清理和重启；按 1C1D/3C3D、树模型/表模型配置 SQL-test，SQL-test 只连接一个 dn_rpc_address:6667，树模型 URL 不带任何查询参数；先执行 setup，再清理重启并执行 test；model=both 时按 tree setup/test 和 table setup/test 分开执行；COMPARE RESULT 失败时自动分析 .result/.out 差异，忽略 Elapsed Time 和 COMPARE 状态行，只询问是否再次比对或追加屏蔽列到 special_query.csv；把实际执行的 .run 和结果产物拉回指定本地目录并生成固定报告。所有面向用户的步骤说明、执行状态、失败分析、确认选项、最终结果和报告正文都使用中文。"
+  default_prompt: "按 IoTDB/TimechoDB SQL 用例流水线处理：根据需求默认检索官方手册，先生成 Markdown，再生成 .run；可按 1C1D/3C3D、tree/table/both 执行 setup/test、清理重启、产物拉回和报告生成；COMPARE RESULT 失败时自动分析 .result/.out 与 special_query.csv 候选列。所有用户可见说明使用中文。"
 
 policy:
   allow_implicit_invocation: true
