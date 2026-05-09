@@ -210,34 +210,16 @@ select * from root.**;Time;
 
 只有在用户选择追加后，Codex 才会备份并更新 `special_query.csv`，然后重新执行 `setup -> 清理重启 -> test`，确保 `.result` 和 `.out` 使用同一套屏蔽规则。
 
-## 1C1D 完整执行 Prompt
+## 1C1D 精简 Prompt
 
-复制下面的 prompt，并替换尖括号里的内容：
+日常实验推荐只写触发句、环境信息和需求。官网检索、Markdown 生成、`.run` 生成、SQL-test 配置、setup/test、结果对比、产物拉回和报告生成都由 skill 自动执行。
 
 ```text
-请在 1C1D 环境执行 IoTDB/TimechoDB SQL 用例自动化完整流水线。
-
-执行要求：
-0. 操作步骤、执行状态、失败分析、用户确认选项、最终结果和 execution-report.md 都用中文表达；命令、路径、SQL、配置 key 和日志原文保留原文。
-1. 先根据需求生成详细 Markdown 表格形式用例文件。
-2. 不需要我提供官网链接；请根据模型类型默认检索官方用户手册相关章节，并把引用到的章节写入 Markdown 的需求来源和 .run 的来源注释。
-3. 如果模型类型是 both，把用例拆成 tree 和 table 两套 Markdown、两套 .run、两套拉回产物；不要混在同一个 .run。
-4. Markdown 和本地生成的 .run 保存到“本地用例文件目录”。
-5. Markdown 静态检查通过后，自动生成 .run 文件，不要停在 Markdown 阶段。
-6. 把 .run 部署到 SQL-test 工具目录下的 user/scripts/<feature>/ 目录执行；执行完后把远端实际执行的 .run 再拉回本地拉回产物目录。
-7. 使用我传入的 IoTDB 安装目录和 SQL-test 工具目录，先检查目录是否存在、配置是否正确，再执行操作。
-8. 根据模型类型配置 SQL-test：表模型需要 sql_dialect=table，树模型不能保留 sql_dialect=table。
-9. 读取 IoTDB 的 dn_rpc_address；SQL-test 的 iotdbURL 要同步成相同 IP，端口固定为 6667。
-10. 检查是否存在时间、任务 ID、耗时、节点地址等不稳定列；如有，先备份并更新 user/CONFIG/special_query.csv。
-11. 先把 SQL-test 改成 setup 模式并执行，生成 .result。
-12. setup 执行完成后，停止 IoTDB，删除 IoTDB 安装目录下的 data 和 logs，再启动 IoTDB。
-13. 再把 SQL-test 改成 test 模式执行，生成 .out 并对比 result.xml。
-14. 如果模型类型是 both，需要按 tree setup -> tree test -> table setup -> table test 分开执行，期间按模型切换 SQL-test 配置并分别清理重启。
-15. 如果发现 COMPARE RESULT : FAIL 或 result.xml 失败，自动对比对应 .result/.out，列出具体 SQL 和差异列，只让我选择“再次运行比对”或“追加屏蔽列到 special_query.csv”。
-16. 拉回远端 .run、.result、.out、result.xml、special_query.csv、日志和截图到“本地拉回产物目录”，生成 execution-report.md。
+请按 IoTDB/TimechoDB SQL 用例自动化流水线处理下面的需求，全程用中文说明步骤和结果。
 
 拓扑：1C1D
 模型类型：<tree、table 或 both>
+执行方式：完整执行
 本地用例文件目录：<本地保存 Markdown 用例和本地 .run 的目录>
 本地拉回产物目录：<本地保存远端 .run、.result、.out、result.xml、日志等产物的目录>
 1C1D 主机：<主机 IP>
@@ -251,35 +233,16 @@ SQL-test 工具目录：<远端 /data/iotdb-sql-test-master 等目录>
 <粘贴需求、设计文档或 issue 内容；官网链接可选>
 ```
 
-## 3C3D 完整执行 Prompt
+## 3C3D 精简 Prompt
 
-复制下面的 prompt，并替换尖括号里的内容：
+3C3D 只需要额外填三台节点和对应 key。SQL-test 仍然只在指定执行主机运行，集群停止、清理和重启由 skill 覆盖三台节点。
 
 ```text
-请在 3C3D 环境执行 IoTDB/TimechoDB SQL 用例自动化完整流水线。
-
-执行要求：
-0. 操作步骤、执行状态、失败分析、用户确认选项、最终结果和 execution-report.md 都用中文表达；命令、路径、SQL、配置 key 和日志原文保留原文。
-1. 先根据需求生成详细 Markdown 表格形式用例文件。
-2. 不需要我提供官网链接；请根据模型类型默认检索官方用户手册相关章节，并把引用到的章节写入 Markdown 的需求来源和 .run 的来源注释。
-3. 如果模型类型是 both，把用例拆成 tree 和 table 两套 Markdown、两套 .run、两套拉回产物；不要混在同一个 .run。
-4. Markdown 和本地生成的 .run 保存到“本地用例文件目录”。
-5. Markdown 静态检查通过后，自动生成 .run 文件，不要停在 Markdown 阶段。
-6. 把 .run 部署到 SQL-test 工具目录下的 user/scripts/<feature>/ 目录执行；执行完后把远端实际执行的 .run 再拉回本地拉回产物目录。
-7. 使用我传入的 IoTDB 安装目录和 SQL-test 工具目录，先检查三台集群节点上的 IoTDB 目录是否存在、配置是否正确，再执行操作。
-8. 根据模型类型配置 SQL-test：表模型需要 sql_dialect=table，树模型不能保留 sql_dialect=table。
-9. 读取其中一个集群节点配置中的 dn_rpc_address；SQL-test 的 iotdbURL 要同步成相同 IP，端口固定为 6667。
-10. SQL-test 可以在指定执行主机上跑，但 iotdbURL 必须指向配置文件里的 dn_rpc_address，不要默认等同于 SQL-test 执行主机。
-11. 检查是否存在时间、任务 ID、耗时、节点地址等不稳定列；如有，先备份并更新 user/CONFIG/special_query.csv。
-12. 先把 SQL-test 改成 setup 模式并执行，生成 .result。
-13. setup 执行完成后，停止三台集群节点上的 IoTDB，分别删除三台节点 IoTDB 安装目录下的 data 和 logs，再启动三台节点。
-14. 再把 SQL-test 改成 test 模式执行，生成 .out 并对比 result.xml。
-15. 如果模型类型是 both，需要按 tree setup -> tree test -> table setup -> table test 分开执行，期间按模型切换 SQL-test 配置，并且每次清理重启都覆盖三台节点。
-16. 如果发现 COMPARE RESULT : FAIL 或 result.xml 失败，自动对比对应 .result/.out，列出具体 SQL 和差异列，只让我选择“再次运行比对”或“追加屏蔽列到 special_query.csv”。
-17. 拉回远端 .run、.result、.out、result.xml、special_query.csv、日志和截图到“本地拉回产物目录”，生成 execution-report.md。
+请按 IoTDB/TimechoDB SQL 用例自动化流水线在 3C3D 环境处理下面的需求，全程用中文说明步骤和结果。
 
 拓扑：3C3D
 模型类型：<tree、table 或 both>
+执行方式：完整执行
 本地用例文件目录：<本地保存 Markdown 用例和本地 .run 的目录>
 本地拉回产物目录：<本地保存远端 .run、.result、.out、result.xml、日志等产物的目录>
 3C3D 集群节点 1：<节点 1 IP 或主机名>
@@ -302,11 +265,7 @@ SQL-test 工具目录：<远端 /data/iotdb-sql-test-master 等目录>
 如果暂时不执行远端环境，只想生成文件：
 
 ```text
-根据下面的 IoTDB/TimechoDB 需求生成详细 Markdown 表格形式 SQL 用例文件。
-操作步骤、执行状态、失败分析、最终结果和生成文件正文都用中文表达；命令、路径、SQL、配置 key 和日志原文保留原文。
-不需要我提供官网链接；请根据模型类型默认检索官方用户手册相关章节，并把引用到的章节写入 Markdown 的需求来源和 .run 的来源注释。
-Markdown 静态检查通过后，继续自动生成 .run 文件。
-先不要部署和执行远端环境。
+请根据下面的 IoTDB/TimechoDB 需求只生成 Markdown 用例和 .run，先不要部署或执行远端环境，全程用中文说明结果。
 
 模型类型：<tree、table 或 both>
 本地用例文件目录：<本地保存 Markdown 用例和本地 .run 的目录>
