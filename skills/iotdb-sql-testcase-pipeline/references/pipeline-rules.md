@@ -13,9 +13,9 @@ Collect these before execution. If the user already provides the IoTDB install d
 | Source docs | Yes | Requirement/design docs or issue text. Official docs URLs are optional because the skill searches official manuals by default. |
 | Local case artifact directory | Yes | Stores the generated Markdown cases, local generated `.run`, wrappers, and `execution-report.md`. If omitted, use `<current workspace>/<requirement-item>/`. |
 | Local pullback artifact directory | Yes | Stores files pulled back from SQL-test after execution. If omitted, use `<local case artifact directory>/artifacts/`. |
-| Cluster access host | Yes | One host is enough for both `1C1D` and `3C3D`; for `3C3D`, use any reachable cluster node. |
-| SQL-test runner host | Yes | May be the same as the cluster access host. |
-| SSH identity | Yes | Use `IOTDB_SSH_KEY` or a local private key path; never write passwords. |
+| IoTDB node hosts | Yes | For `1C1D`, one host. For `3C3D`, all three cluster node hosts are required for stop, cleanup, and restart. |
+| SQL-test runner host | Yes | May be the same as one IoTDB node host. |
+| SSH identity | Yes | Use `IOTDB_SSH_KEY`, per-node local private key paths, or one confirmed shared key. For `3C3D`, SSH must work for all three nodes. Never write passwords. |
 | IoTDB install path | Yes | User may pass it directly. Verify `conf/` and `sbin/` before use. |
 | SQL-test tool path | Yes | User may pass it directly. Verify `test.sh` and `user/CONFIG/otf_new.properties`. |
 
@@ -73,12 +73,13 @@ Lookup rules:
 
 ### 3C3D
 
-- Do not require three host IPs from the user. One reachable cluster node IP is enough.
-- Verify the supplied IoTDB directory on that cluster node.
-- Read that node's `dn_rpc_address` from `conf/iotdb-datanode.properties`; SQL-test should connect to that address.
+- Require all three cluster node hosts from the user.
+- Verify SSH and the supplied IoTDB directory on all three nodes.
+- Read `dn_rpc_address` from one selected DataNode config; SQL-test should connect to that single address.
 - Use fixed RPC port `6667`.
-- Choose one SQL-test runner host explicitly. It may be the same as the cluster access host.
+- Choose one SQL-test runner host explicitly. It may be one of the three IoTDB node hosts.
 - Do not assume the SQL-test runner host is the same as `dn_rpc_address`; always follow the config value.
+- Stop, clean `data/` and `logs`, and restart IoTDB on all three cluster nodes. Codex can orchestrate these SSH commands from one local session, but the remote operations must cover every node.
 
 ## Directory Verification
 
@@ -97,6 +98,8 @@ test -d "$SQL_TEST_DIR/user/result"
 ```
 
 Do not silently fall back to stale remembered paths when the user supplied explicit directories. If a supplied directory is wrong, report the failed check and stop.
+
+For `3C3D`, run the IoTDB directory checks on all three supplied node hosts. Run the SQL-test directory checks on the SQL-test runner host.
 
 ## Markdown Case Requirements
 
@@ -263,7 +266,7 @@ Then table-model SQL-test config should use:
 iotdbURL=jdbc:iotdb://<rpc_address>:6667?version=V_1_0&sql_dialect=table
 ```
 
-For `3C3D`, do not require three node IPs. The SQL-test runner may be one host while `iotdbURL` points to the `dn_rpc_address` value read from the cluster node config.
+For `3C3D`, require all three node hosts for lifecycle operations. The SQL-test runner may be one host while `iotdbURL` points to the single `dn_rpc_address` value read from the selected cluster node config.
 
 Back up config files before editing:
 
@@ -329,7 +332,7 @@ sudo -n ./sbin/stop-confignode.sh
 sudo -n ./sbin/stop-datanode.sh
 ```
 
-For `1C1D`, run start/stop on the single IoTDB host. For `3C3D`, run start/stop on the supplied cluster access host; do not demand three host IPs. If `sudo -n` fails, do not embed passwords. Report that passwordless sudo or an interactive secure method is required.
+For `1C1D`, run start/stop on the single IoTDB host. For `3C3D`, run start/stop on all three supplied cluster nodes and keep node-specific logs. If `sudo -n` fails on any node, do not embed passwords. Report that passwordless sudo or an interactive secure method is required for that node.
 
 ## Setup/Test Execution Sequence
 
@@ -352,7 +355,7 @@ cd "$SQL_TEST_DIR"
 ```
 
 9. Collect generated `.result` files and setup logs.
-10. Stop IoTDB on the supplied `1C1D` host or supplied `3C3D` cluster access host.
+10. Stop IoTDB on the supplied `1C1D` host, or on all three supplied `3C3D` cluster nodes.
 11. Resolve and verify cleanup paths before deletion:
 
 ```bash
@@ -367,8 +370,8 @@ test -d "$IOTDB_DIR/data" && test -d "$IOTDB_DIR/logs"
 rm -rf "$IOTDB_DIR/data" "$IOTDB_DIR/logs"
 ```
 
-13. Restart IoTDB on the supplied `1C1D` host or supplied `3C3D` cluster access host.
-14. Re-check process and RPC port `6667`.
+13. Restart IoTDB on the supplied `1C1D` host, or on all three supplied `3C3D` cluster nodes.
+14. Re-check processes on every restarted node and RPC port `6667` on the SQL-test connection node.
 15. Set SQL-test execution mode to `test`.
 16. Run `./test.sh` again.
 17. Pull back the remote executed `.run`, `.out`, `result.xml`, test logs, `special_query.csv`, and any updated `.result` references needed for diagnosis into the local pullback artifact directory. For `both`, use the model-specific pullback directory.
