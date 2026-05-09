@@ -1,6 +1,6 @@
 ---
 name: iotdb-sql-testcase-pipeline
-description: Use when Codex needs to turn IoTDB/TimechoDB SQL requirements, design docs, issues, or official manual topics into detailed Markdown cases and .run files, or operate 1C1D/3C3D SQL-test environments from provided IoTDB and sql-test directories, including default official manual lookup, tree/table config, rpc_address/iotdbURL sync, special_query.csv result masking, setup/test runs, restarts, artifact collection, reports, or screenshots.
+description: Use when Codex needs to turn IoTDB/TimechoDB SQL requirements, design docs, issues, or official manual topics into detailed Markdown cases and .run files, or operate 1C1D/3C3D SQL-test environments from provided IoTDB and sql-test directories, including default official manual lookup, 3C3D all-node cleanup/restart, tree/table config, rpc_address/iotdbURL sync, special_query.csv result masking, setup/test runs, restarts, artifact collection, reports, or screenshots.
 ---
 
 # IoTDB SQL Testcase Pipeline
@@ -23,7 +23,7 @@ When the user provides requirement text, a design document, or issue content wit
 
 ## Workflow
 
-1. Collect the requirement text, version directory, target topology (`1C1D` or `3C3D`), target model (`table`, `tree`, or both), optional official documentation links, local case artifact directory, local pullback artifact directory, one cluster access host, SQL-test runner host, SSH key path, remote IoTDB install directory, and SQL-test tool directory. If the user passes the IoTDB directory and SQL-test directory, treat those as the first paths to verify and execute against. For `3C3D`, do not require three host IPs; one reachable cluster node is enough.
+1. Collect the requirement text, version directory, target topology (`1C1D` or `3C3D`), target model (`table`, `tree`, or both), optional official documentation links, local case artifact directory, local pullback artifact directory, IoTDB node hosts, SQL-test runner host, SSH user/key for each node or one confirmed shared key, remote IoTDB install directory, and SQL-test tool directory. If the user passes the IoTDB directory and SQL-test directory, treat those as the first paths to verify and execute against. For `3C3D`, require all three cluster node hosts so stop, cleanup, and restart can run on every node.
 2. Search the official manual by default:
    - Tree model: `https://www.timecho.com/docs/zh/UserGuide/latest/`
    - Table model: `https://www.timecho.com/docs/zh/UserGuide/latest-Table/`
@@ -33,7 +33,7 @@ When the user provides requirement text, a design document, or issue content wit
 4. Verify the remote directories before generation/deployment:
    - IoTDB directory contains expected `conf/` and `sbin/` files.
    - SQL-test directory contains `test.sh`, `user/CONFIG/otf_new.properties`, `user/scripts/`, and `user/result/`.
-   - For `3C3D`, verify the supplied cluster access host and choose the SQL-test runner host explicitly.
+   - For `3C3D`, verify SSH and the supplied IoTDB directory on all three cluster nodes, and choose the SQL-test runner host explicitly.
 5. Generate a detailed Markdown table case file first. Then immediately self-review and lint it. In the normal automatic flow, do not wait for a separate manual review before `.run` generation unless the user asked for "Markdown only" or "review first".
 6. Generate the automation artifact that matches the target:
    - `.run` for SQL automation tool flows.
@@ -52,9 +52,9 @@ When the user provides requirement text, a design document, or issue content wit
 11. Deploy the executable `.run` to the target SQL-test directory using SSH key authentication or an existing secure runtime configuration. The `.run` that SQL-test executes must be under `<SQL_TEST_DIR>/user/scripts/<feature>/<case-name>.run`.
 12. Execute the two-phase automation flow when the user asks for full execution:
    - Set SQL-test mode to `setup`, execute, and collect `.result` artifacts.
-   - Stop IoTDB on the supplied `1C1D` host or supplied `3C3D` cluster access host.
-   - Clean only the verified IoTDB `data/` and `logs/` directories.
-   - Restart IoTDB, re-check RPC port `6667`, set SQL-test mode to `test`, execute again, and collect `.out`, `result.xml`, and logs.
+   - Stop IoTDB on the supplied `1C1D` host, or on all three supplied `3C3D` cluster nodes.
+   - Clean only the verified IoTDB `data/` and `logs/` directories on each node being restarted.
+   - Restart IoTDB, re-check RPC port `6667` on the SQL-test connection node, set SQL-test mode to `test`, execute again, and collect `.out`, `result.xml`, and logs.
    - For model `both`, run this full two-phase flow separately for tree and table: tree `setup`, clean/restart, tree `test`, then reconfigure SQL-test for table, table `setup`, clean/restart, table `test`. This means four SQL-test executions total.
 13. If the test run exits nonzero, `result.xml` reports failures, or `.out` contains `###### COMPARE RESULT : FAIL ######`, automatically pair the relevant `.result` and `.out` files and run `scripts/suggest_special_query_masks.py`. State the exact SQL and differing result columns, then ask only for the user's decision: re-run comparison, or append/merge suggested mask columns into `special_query.csv`.
 14. Pull back the deployed `.run`, `.result`, `.out`, `result.xml`, logs, wrapper output, `special_query.csv`, and any exported data summaries needed for validation into the local pullback artifact directory.
@@ -69,7 +69,7 @@ When the user does not provide a different environment, use the repository memor
 - Fallback key path on this workstation: `C:\Users\tiany\.ssh\sql_testcase_automation_ed25519`
 - SQL automation host: user-provided SQL-test runner host.
 - Common 1C1D topology: one host running both ConfigNode and DataNode.
-- Common 3C3D topology: provide any one reachable cluster node; do not require three IPs.
+- Common 3C3D topology: provide all three cluster node hosts for stop/clean/start. SQL-test still connects to one `dn_rpc_address:6667` read from the selected DataNode config.
 - Local case artifact directory: user-provided path, or `<current workspace>/<requirement-item>/`.
 - Local pullback artifact directory: user-provided path, or `<local case artifact directory>/artifacts/`.
 - SQL automation root: `/data/iotdb-sql-test-master`
@@ -83,6 +83,7 @@ Treat these as defaults, not facts. Verify active paths and configs on the remot
 - Do not require the user to provide official documentation links. Search the official manuals by default and cite relevant manual sections when they influence coverage or expected results. If network access is unavailable, state that gap in the report or final response.
 - Do not overwrite `.result` baselines unless the user explicitly asks for setup/baseline generation or full setup/test execution and the version/environment is intentionally under test.
 - Do not delete remote IoTDB `data` or `logs` directories unless the user explicitly asks for the setup/test clean restart flow. Before deletion, resolve the absolute paths and verify they are exactly under the supplied IoTDB install directory.
+- For `3C3D`, lifecycle operations are cluster-wide: verify SSH to all three nodes, stop IoTDB on all three, delete only each node's verified `data/` and `logs/`, and restart all three. Do not clean/restart just one node.
 - Do not hardcode SSH passwords. If key-based SSH is unavailable, ask the user to configure a key or provide an interactive secure method.
 - For table model cases, create a database and `use <database>` after connecting; after switching users, run `use <database>` again.
 - For tree model cases, do not use `use`; use full paths such as `root.test.d1.s1`.

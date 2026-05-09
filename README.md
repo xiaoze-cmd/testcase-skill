@@ -15,6 +15,7 @@
 - 根据用户传入的 IoTDB 安装目录和 SQL-test 工具目录做远端检查
 - 支持 `1C1D` 和 `3C3D` 两种执行拓扑
 - 支持树模型和表模型，两者配置不同
+- `3C3D` 需要提供三台集群节点地址和可用 SSH key；清理、停止、重启会覆盖三台节点
 - 如果模型类型是 `both`，会拆成树模型和表模型两套用例、两套 `.run`，并分别执行 setup/test
 - 自动同步 IoTDB `dn_rpc_address` 与 SQL-test `iotdbURL`，端口固定为 `6667`
 - 根据需要维护 SQL-test `special_query.csv` 屏蔽文件，用于忽略不稳定结果列
@@ -59,12 +60,12 @@ Use $iotdb-sql-testcase-pipeline.
 | SQL-test 工具目录 | `/data/iotdb-sql-test-master` |
 | SQL-test 执行主机 | `<SQL-test 所在主机 IP>` |
 | 1C1D 主机 | `<1C1D 主机 IP>` |
-| 3C3D 集群节点 | `<集群任意一个节点 IP>` |
-| SSH 用户和 key | `ubuntu`、`IOTDB_SSH_KEY` 或本地 key 路径 |
+| 3C3D 集群节点 | `<三个集群节点 IP 或主机名>` |
+| SSH 用户和 key | `ubuntu`、`IOTDB_SSH_KEY`、三台节点各自的 key，或确认三台共用同一个 key |
 | 需求内容 | 需求文档、设计文档或 issue 内容；官网链接可选 |
 
 Codex 会先验证传入的 IoTDB 目录和 SQL-test 目录，再执行后续操作；不会优先使用旧记忆里的路径覆盖用户传入的路径。
-针对 `3C3D` 集群测试，只需要提供集群中的任意一个节点 IP，不需要提供三台主机 IP。
+针对 `3C3D` 集群测试，需要提供三台节点地址。SQL-test 连接仍然只使用配置文件中的一个 `dn_rpc_address:6667`，但停止、清理 `data/logs`、重启必须在三台节点上都执行。
 
 ## 本地产物目录
 
@@ -260,15 +261,15 @@ SQL-test 工具目录：<远端 /data/iotdb-sql-test-master 等目录>
 4. Markdown 和本地生成的 .run 保存到“本地用例文件目录”。
 5. Markdown 静态检查通过后，自动生成 .run 文件，不要停在 Markdown 阶段。
 6. 把 .run 部署到 SQL-test 工具目录下的 user/scripts/<feature>/ 目录执行；执行完后把远端实际执行的 .run 再拉回本地拉回产物目录。
-7. 使用我传入的 IoTDB 安装目录和 SQL-test 工具目录，先检查该集群节点上的目录是否存在、配置是否正确，再执行操作。
+7. 使用我传入的 IoTDB 安装目录和 SQL-test 工具目录，先检查三台集群节点上的 IoTDB 目录是否存在、配置是否正确，再执行操作。
 8. 根据模型类型配置 SQL-test：表模型需要 sql_dialect=table，树模型不能保留 sql_dialect=table。
-9. 读取该节点配置中的 dn_rpc_address；SQL-test 的 iotdbURL 要同步成相同 IP，端口固定为 6667。
+9. 读取其中一个集群节点配置中的 dn_rpc_address；SQL-test 的 iotdbURL 要同步成相同 IP，端口固定为 6667。
 10. SQL-test 可以在指定执行主机上跑，但 iotdbURL 必须指向配置文件里的 dn_rpc_address，不要默认等同于 SQL-test 执行主机。
 11. 检查是否存在时间、任务 ID、耗时、节点地址等不稳定列；如有，先备份并更新 user/CONFIG/special_query.csv。
 12. 先把 SQL-test 改成 setup 模式并执行，生成 .result。
-13. setup 执行完成后，停止该集群节点上的 IoTDB，删除该 IoTDB 安装目录下的 data 和 logs，再启动 IoTDB。
+13. setup 执行完成后，停止三台集群节点上的 IoTDB，分别删除三台节点 IoTDB 安装目录下的 data 和 logs，再启动三台节点。
 14. 再把 SQL-test 改成 test 模式执行，生成 .out 并对比 result.xml。
-15. 如果模型类型是 both，需要按 tree setup -> tree test -> table setup -> table test 分开执行，期间按模型切换 SQL-test 配置并分别清理重启。
+15. 如果模型类型是 both，需要按 tree setup -> tree test -> table setup -> table test 分开执行，期间按模型切换 SQL-test 配置，并且每次清理重启都覆盖三台节点。
 16. 如果发现 COMPARE RESULT : FAIL 或 result.xml 失败，自动对比对应 .result/.out，列出具体 SQL 和差异列，只让我选择“再次运行比对”或“追加屏蔽列到 special_query.csv”。
 17. 拉回远端 .run、.result、.out、result.xml、special_query.csv、日志和截图到“本地拉回产物目录”，生成 execution-report.md。
 
@@ -276,10 +277,14 @@ SQL-test 工具目录：<远端 /data/iotdb-sql-test-master 等目录>
 模型类型：<tree、table 或 both>
 本地用例文件目录：<本地保存 Markdown 用例和本地 .run 的目录>
 本地拉回产物目录：<本地保存远端 .run、.result、.out、result.xml、日志等产物的目录>
-3C3D 集群节点：<集群任意一个节点 IP>
+3C3D 集群节点 1：<节点 1 IP 或主机名>
+3C3D 集群节点 2：<节点 2 IP 或主机名>
+3C3D 集群节点 3：<节点 3 IP 或主机名>
 SQL-test 执行主机：<主机 IP>
 SSH 用户：<ubuntu 或其他用户>
-SSH key：<IOTDB_SSH_KEY 或本地 key 路径>
+SSH key 节点 1：<IOTDB_SSH_KEY、本地 key 路径，或共用 key>
+SSH key 节点 2：<IOTDB_SSH_KEY、本地 key 路径，或共用 key>
+SSH key 节点 3：<IOTDB_SSH_KEY、本地 key 路径，或共用 key>
 IoTDB 安装目录：<远端 IoTDB 安装目录>
 SQL-test 工具目录：<远端 /data/iotdb-sql-test-master 等目录>
 
@@ -322,6 +327,7 @@ skills/
 - 默认是 Markdown 检查通过后自动生成 `.run`。
 - Markdown 用例和本地生成的 `.run` 放在“本地用例文件目录”；远端实际执行的 `.run` 必须放在 SQL-test 工具目录的 `user/scripts/<feature>/` 下。
 - 模型类型是 `both` 时必须拆成 tree/table 两套 Markdown、两套 `.run`、两套产物目录；完整执行需要四次 SQL-test：tree setup、tree test、table setup、table test。
+- `3C3D` 必须提供三台节点地址和可用 SSH key。SQL-test 只连接一个 `dn_rpc_address:6667`，但停止、清理、重启要覆盖三台节点。
 - 执行完成后需要把远端实际执行的 `.run` 和 `.result`、`.out`、`result.xml`、日志等一起拉回“本地拉回产物目录”。
 - 远端执行前必须确认目标主机、IoTDB 安装目录、SQL-test 工具目录、目标 `.run` 文件和 `otf_new.properties`。
 - 树模型和表模型配置不同，不能混用 `sql_dialect=table`。
