@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Suggest special_query.csv rows from SQL-test .result/.out differences."""
+"""根据 SQL-test .result/.out 差异建议 special_query.csv 屏蔽列。"""
 
 from __future__ import annotations
 
@@ -158,12 +158,12 @@ def parse_table(block: Block) -> Table | None:
 def compare_tables(result: Table, output: Table) -> tuple[set[str], list[str]]:
     notes: list[str] = []
     if [normalize_col(c) for c in result.columns] != [normalize_col(c) for c in output.columns]:
-        notes.append("column headers differ; inspect manually")
+        notes.append("列名不一致，需要人工检查")
         return set(), notes
 
     differing_columns: set[str] = set()
     if len(result.rows) != len(output.rows):
-        notes.append(f"row count differs: result={len(result.rows)}, out={len(output.rows)}")
+        notes.append(f"行数不一致：result={len(result.rows)}，out={len(output.rows)}")
 
     for left, right in zip(result.rows, output.rows):
         for idx, (left_value, right_value) in enumerate(zip(left, right)):
@@ -200,16 +200,16 @@ def merge_special_query(path: Path, suggestions: list[Suggestion]) -> list[str]:
             seen = {normalize_col(column) for column in columns}
             added = [column for column in suggestion.columns if normalize_col(column) not in seen]
             if not added:
-                changes.append(f"unchanged: {suggestion.sql}")
+                changes.append(f"未变更：{suggestion.sql}")
                 continue
             merged = columns + added
             existing_lines[idx] = sql + ";" + ";".join(merged) + ";"
             index[key] = (idx, sql, merged)
-            changes.append(f"updated: {suggestion.sql}; added {', '.join(added)}")
+            changes.append(f"已更新：{suggestion.sql}；新增列 {', '.join(added)}")
         else:
             existing_lines.append(suggestion.row)
             index[key] = (len(existing_lines) - 1, suggestion.sql, suggestion.columns)
-            changes.append(f"added: {suggestion.row}")
+            changes.append(f"已新增：{suggestion.row}")
 
     content = "\n".join(existing_lines)
     if content:
@@ -221,20 +221,20 @@ def merge_special_query(path: Path, suggestions: list[Suggestion]) -> list[str]:
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="List SQL-test .result/.out differing columns and suggest special_query.csv rows."
+        description="列出 SQL-test .result/.out 差异列，并建议 special_query.csv 屏蔽行。"
     )
-    parser.add_argument("--result", required=True, help="Baseline .result file")
-    parser.add_argument("--out", required=True, help="Test .out file")
+    parser.add_argument("--result", required=True, help="基准 .result 文件")
+    parser.add_argument("--out", required=True, help="测试 .out 文件")
     parser.add_argument(
         "--include-business-columns",
         action="store_true",
-        help="Suggest all differing columns. By default only known volatile columns are suggested.",
+        help="建议所有差异列。默认只建议已知不稳定列。",
     )
-    parser.add_argument("--special-query", help="Path to user/CONFIG/special_query.csv")
+    parser.add_argument("--special-query", help="user/CONFIG/special_query.csv 路径")
     parser.add_argument(
         "--append",
         action="store_true",
-        help="Append or merge suggested mask columns into --special-query. Use only after confirming masking is desired.",
+        help="追加或合并建议屏蔽列到 --special-query。只应在用户确认后使用。",
     )
     args = parser.parse_args()
     if args.append and not args.special_query:
@@ -258,12 +258,12 @@ def main() -> int:
             continue
 
         printed_any = True
-        print(f"\nSQL: {result_block.sql}")
+        print(f"\nSQL 语句：{result_block.sql}")
         if notes:
             for note in notes:
-                print(f"  NOTE: {note}")
+                print(f"  提示：{note}")
         if differing_columns:
-            print("  Differing result columns: " + ", ".join(sorted(differing_columns)))
+            print("  差异结果列：" + ", ".join(sorted(differing_columns)))
             volatile = [
                 col for col in sorted(differing_columns) if normalize_col(col) in KNOWN_VOLATILE_COLUMNS
             ]
@@ -274,16 +274,16 @@ def main() -> int:
             if mask_cols:
                 row = result_block.sql + ";" + ";".join(mask_cols) + ";"
                 suggestions.append(Suggestion(result_block.sql, mask_cols, row))
-                print("  Suggested special_query.csv row: " + row)
+                print("  建议追加的 special_query.csv 行：" + row)
             else:
-                print("  No automatic mask suggestion; differing columns look business-related.")
+                print("  未自动建议屏蔽列；差异列看起来是业务结果列，需要人工确认。")
 
     if suggestions:
-        print("\nSuggested special_query.csv additions:")
+        print("\n建议追加到 special_query.csv 的内容：")
         for suggestion in suggestions:
             print(suggestion.row)
-        print("\nNext choices:")
-        print("1. Re-run comparison after another test execution if the differences may be environmental noise.")
+        print("\n下一步请选择：")
+        print("1. 再次运行比对：如果差异可能来自环境波动，重新执行一次 test 后再比较。")
         if args.special_query:
             append_cmd = (
                 f"python {Path(__file__).name} --result {args.result} --out {args.out} "
@@ -291,20 +291,20 @@ def main() -> int:
             )
             if args.include_business_columns:
                 append_cmd += " --include-business-columns"
-            print("2. Append/merge the suggested mask columns into special_query.csv:")
+            print("2. 追加/合并屏蔽列到 special_query.csv：")
             print("   " + append_cmd)
         else:
-            print("2. Append/merge the suggested mask columns into special_query.csv after confirming them.")
-            print("   Re-run this script with --special-query <path> --append.")
+            print("2. 确认后追加/合并屏蔽列到 special_query.csv。")
+            print("   使用 --special-query <path> --append 重新运行本脚本。")
         if args.append:
             changes = merge_special_query(Path(args.special_query), suggestions)
-            print("\nApplied special_query.csv changes:")
+            print("\n已应用 special_query.csv 变更：")
             for change in changes:
                 print("- " + change)
     elif not printed_any:
-        print("No comparable result table differences found. Tool status lines such as Elapsed Time are ignored.")
+        print("没有找到可比较的结果表差异。已忽略 Elapsed Time 等工具状态行。")
     else:
-        print("\nNo automatic special_query.csv additions suggested.")
+        print("\n没有自动建议追加到 special_query.csv 的内容。")
 
     return 0
 

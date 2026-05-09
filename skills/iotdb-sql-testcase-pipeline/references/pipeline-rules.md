@@ -21,6 +21,19 @@ Collect these before execution. If the user already provides the IoTDB install d
 
 If a requested detail can be discovered safely from local files or the remote server, discover it instead of stopping.
 
+## User-Facing Chinese Output
+
+All user-facing workflow text must be in Simplified Chinese: progress updates, operation steps, execution status, failure analysis, confirmation choices, final summaries, generated Markdown case descriptions, `.run` Chinese comments, and `execution-report.md`.
+
+Do not translate commands, file paths, SQL, config keys, environment variable names, filenames, raw log excerpts, error codes, or fixed tool output. When referencing English logs or tool messages, quote the original only when needed and explain the result in Chinese.
+
+When execution fails or pauses for a decision, state in Chinese:
+
+1. 当前已经完成的步骤。
+2. 当前卡住的具体步骤。
+3. 证据来源，例如日志路径、退出码、`result.xml` 或 `.out` 文件。
+4. 下一步只需要用户确认的选项。
+
 ## Local Artifact Layout
 
 Keep local generation and remote execution paths separate.
@@ -425,8 +438,8 @@ The script lists differing result-table columns and suggests `special_query.csv`
 
 After suggesting mask columns, state the exact SQL and differing columns, then stop for only this decision:
 
-1. Re-run comparison after another test execution if the difference may be caused by environment noise.
-2. Append/merge the suggested mask columns into `special_query.csv`.
+1. 再次运行比对：如果差异可能来自环境波动，重新执行一次 test 后再比较。
+2. 追加/合并屏蔽列到 `special_query.csv`：如果确认差异列属于环境相关不稳定列，则备份并更新屏蔽文件。
 
 Only append after the user chooses that option. Back up `special_query.csv` first, then use:
 

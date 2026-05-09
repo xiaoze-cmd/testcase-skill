@@ -9,6 +9,7 @@
 这个 skill 用于把 IoTDB/TimechoDB 的需求文档、设计文档、官网章节、issue 或功能目录转换为完整的 SQL 自动化流程：
 
 - 默认根据需求、设计文档或 issue 去官方用户手册检索相关章节，不要求用户额外提供官网链接
+- 执行过程中的步骤说明、状态更新、失败分析、确认选项、最终结果和报告正文默认使用中文
 - 先生成详细 Markdown 表格形式用例文件
 - Markdown 静态检查通过后，自动生成 `.run` 文件
 - 按用户指定的本地目录保存 Markdown 用例和本地生成的 `.run`
@@ -45,6 +46,8 @@ Use $iotdb-sql-testcase-pipeline.
 ```
 
 日常使用不需要写 `Use $iotdb-sql-testcase-pipeline.`。直接描述 IoTDB/TimechoDB SQL 用例生成、`.run` 生成、1C1D/3C3D 执行、树模型/表模型配置、setup/test 执行、报告生成等任务即可隐式触发。只要提供需求、设计文档或 issue 内容，Codex 会默认去官方用户手册检索相关章节；官网链接是可选补充。
+
+触发后，Codex 面向用户展示的内容必须使用中文，包括正在执行什么、执行到哪一步、失败原因、下一步可选项、最终结果和 `execution-report.md` 正文。命令、路径、SQL、配置 key、日志原文、错误码、文件名和工具固定输出可以保留原文。
 
 ## 必填信息
 
@@ -215,6 +218,7 @@ select * from root.**;Time;
 请在 1C1D 环境执行 IoTDB/TimechoDB SQL 用例自动化完整流水线。
 
 执行要求：
+0. 操作步骤、执行状态、失败分析、用户确认选项、最终结果和 execution-report.md 都用中文表达；命令、路径、SQL、配置 key 和日志原文保留原文。
 1. 先根据需求生成详细 Markdown 表格形式用例文件。
 2. 不需要我提供官网链接；请根据模型类型默认检索官方用户手册相关章节，并把引用到的章节写入 Markdown 的需求来源和 .run 的来源注释。
 3. 如果模型类型是 both，把用例拆成 tree 和 table 两套 Markdown、两套 .run、两套拉回产物；不要混在同一个 .run。
@@ -255,6 +259,7 @@ SQL-test 工具目录：<远端 /data/iotdb-sql-test-master 等目录>
 请在 3C3D 环境执行 IoTDB/TimechoDB SQL 用例自动化完整流水线。
 
 执行要求：
+0. 操作步骤、执行状态、失败分析、用户确认选项、最终结果和 execution-report.md 都用中文表达；命令、路径、SQL、配置 key 和日志原文保留原文。
 1. 先根据需求生成详细 Markdown 表格形式用例文件。
 2. 不需要我提供官网链接；请根据模型类型默认检索官方用户手册相关章节，并把引用到的章节写入 Markdown 的需求来源和 .run 的来源注释。
 3. 如果模型类型是 both，把用例拆成 tree 和 table 两套 Markdown、两套 .run、两套拉回产物；不要混在同一个 .run。
@@ -298,6 +303,7 @@ SQL-test 工具目录：<远端 /data/iotdb-sql-test-master 等目录>
 
 ```text
 根据下面的 IoTDB/TimechoDB 需求生成详细 Markdown 表格形式 SQL 用例文件。
+操作步骤、执行状态、失败分析、最终结果和生成文件正文都用中文表达；命令、路径、SQL、配置 key 和日志原文保留原文。
 不需要我提供官网链接；请根据模型类型默认检索官方用户手册相关章节，并把引用到的章节写入 Markdown 的需求来源和 .run 的来源注释。
 Markdown 静态检查通过后，继续自动生成 .run 文件。
 先不要部署和执行远端环境。
@@ -324,6 +330,7 @@ skills/
 ## 使用注意事项
 
 - Markdown 用例是 `.run` 文件的来源，不能跳过。
+- 面向用户的过程说明、步骤、结果、失败原因、确认选项和报告正文都应使用中文；不要把执行过程总结成英文。
 - 默认是 Markdown 检查通过后自动生成 `.run`。
 - Markdown 用例和本地生成的 `.run` 放在“本地用例文件目录”；远端实际执行的 `.run` 必须放在 SQL-test 工具目录的 `user/scripts/<feature>/` 下。
 - 模型类型是 `both` 时必须拆成 tree/table 两套 Markdown、两套 `.run`、两套产物目录；完整执行需要四次 SQL-test：tree setup、tree test、table setup、table test。
