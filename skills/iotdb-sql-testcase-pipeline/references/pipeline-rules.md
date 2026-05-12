@@ -15,9 +15,11 @@ Collect these before execution. If the user already provides the IoTDB install d
 | Local pullback artifact directory | Yes | Stores files pulled back from SQL-test after execution. If omitted, use `<local case artifact directory>/artifacts/`. |
 | IoTDB node hosts | Yes | For `1C1D`, one host. For `3C3D`, all three cluster node hosts are required for stop, cleanup, and restart. |
 | SQL-test runner host | Yes | May be the same as one IoTDB node host. |
+| Benchmark runner host | Required for large data | Default to the SQL-test runner host unless the user specifies a different host. |
 | SSH identity | Yes | Use `IOTDB_SSH_KEY`, per-node local private key paths, or one confirmed shared key. For `3C3D`, SSH must work for all three nodes. Never write passwords. |
 | IoTDB install path | Yes | User may pass it directly. Verify `conf/` and `sbin/` before use. |
 | SQL-test tool path | Yes | User may pass it directly. Verify `test.sh` and `user/CONFIG/otf_new.properties`. |
+| Benchmark tool path | Required for large data | User may pass it directly. Verify `benchmark.sh`, `bin/startup.sh`, and `conf/config.properties`. If omitted, discover common paths on the runner host. |
 
 If a requested detail can be discovered safely from local files or the remote server, discover it instead of stopping.
 
@@ -114,6 +116,25 @@ Do not silently fall back to stale remembered paths when the user supplied expli
 
 For `3C3D`, run the IoTDB directory checks on all three supplied node hosts. Run the SQL-test directory checks on the SQL-test runner host.
 
+For large data cases, also verify benchmark on the benchmark runner host:
+
+```bash
+test -d "$BENCHMARK_DIR"
+test -f "$BENCHMARK_DIR/benchmark.sh"
+test -f "$BENCHMARK_DIR/bin/startup.sh"
+test -f "$BENCHMARK_DIR/conf/config.properties"
+```
+
+Common benchmark candidate paths observed on the project hosts:
+
+```text
+/data/iot-benchmark-iotdb-2.0
+/data/iot-benchmark-2.0/iot-benchmark-iotdb-2.0
+/data/iot-benchmark-v2/iot-benchmark-iotdb-2.0
+```
+
+Prefer the user-supplied benchmark path over discovered candidates.
+
 ## Markdown Case Requirements
 
 Generate Markdown first from the user material plus the official manual lookup. Save it under the local case artifact directory. The normal full pipeline is automatic: create the Markdown table, self-review and lint it, then generate `.run` without waiting for a separate manual review unless the user requested Markdown-only or review-only mode.
@@ -196,6 +217,81 @@ Hard requirements:
 - Long-running/performance cases are separated from normal regression files.
 
 For command-line tools such as `export-data.sh`, generate an executable wrapper script and a command inventory file. The wrapper should log exact command, start/end time, exit code, output directory, validation counts, and cleanup/retention policy.
+
+## Benchmark Large-Data Writes
+
+Use benchmark for data setup when a case requires large-volume writes, such as "大量数据", "大表", performance latency validation, or row counts that would make `.run` contain hundreds of thousands or millions of literal `INSERT` statements. Keep `.run` for DDL, query assertions, result comparison, and cleanup.
+
+Benchmark runner rules:
+
+- Run benchmark from one explicitly chosen runner host. Default to the SQL-test runner host unless the user specifies a separate benchmark host.
+- For `3C3D`, benchmark still connects to one reachable `dn_rpc_address:6667`; lifecycle operations remain all-node.
+- Verify or start IoTDB before benchmark writes. For `3C3D`, start/recheck all three nodes, then verify RPC port `6667` on the selected connection node.
+- Do not edit benchmark's shared `conf/` in place for a test run. Create a run-specific config copy, for example:
+
+```bash
+RUN_ID="<case-name>-$(date +%Y%m%d%H%M%S)"
+RUN_CONF_DIR="$BENCHMARK_DIR/codex-runs/$RUN_ID/conf"
+mkdir -p "$RUN_CONF_DIR"
+cp "$BENCHMARK_DIR"/conf/* "$RUN_CONF_DIR"/
+```
+
+- Back up the original config if an in-place edit is unavoidable, but prefer the copied config directory.
+- Do not write database passwords or private key material into generated local files, reports, or repository files. Use existing remote secure config or user-provided runtime credentials.
+
+Benchmark config keys observed from `conf/config.properties`:
+
+| Key | Purpose |
+|-----|---------|
+| `DB_SWITCH` | Database/version/insert mode. For IoTDB 2.0 tablet writes, use `IoTDB-200-SESSION_BY_TABLET` unless the installed benchmark requires another supported value. |
+| `IoTDB_DIALECT_MODE` | `tree` or `table`. For table-model cases set `table`; for tree-model cases set `tree`. |
+| `HOST` / `PORT` | RPC target. Use `dn_rpc_address` and fixed port `6667`. Multiple hosts use comma-separated values only if benchmark and the target mode require it. |
+| `DB_NAME` | Target database name. Set it explicitly for run isolation. |
+| `IS_DELETE_DATA` | Keep `false` when SQL-test owns setup/drop lifecycle. Use `true` only for a standalone benchmark-owned data reset that the user asked for. |
+| `BENCHMARK_WORK_MODE` | Usually `testWithDefaultPath` for generated benchmark data. |
+| `LOOP` | Total benchmark operations. With write-only workload, drives total generated rows. |
+| `OPERATION_PROPORTION` | Use `1:0:0:0:0:0:0:0:0:0:0:0` for pure writes. |
+| `DEVICE_NUMBER` | Device cardinality. In table mode it must be an integer multiple of `IoTDB_TABLE_NUMBER`. |
+| `SENSOR_NUMBER` | Measurement/field column count. |
+| `SCHEMA_CLIENT_NUMBER` / `DATA_CLIENT_NUMBER` | Metadata and write concurrency. In table mode, data clients must be compatible with table count. |
+| `IoTDB_TABLE_NAME_PREFIX` / `IoTDB_TABLE_NUMBER` | Table-model table naming and table count. Set a unique prefix and record actual table names for SQL-test validation. |
+| `TAG_NUMBER` / `TAG_VALUE_CARDINALITY` | Tag schema and tag cardinality when the case needs tag distribution. |
+| `BATCH_SIZE_PER_WRITE` | Rows per device per write batch. Set explicitly for predictable volume. |
+| `DEVICE_NUM_PER_WRITE` | Devices per write. With `SESSION_BY_TABLET`, keep `1` unless benchmark documentation and selected insert mode support higher values. |
+| `POINT_STEP` / `START_TIME` | Timestamp interval and start time. Set explicitly for repeatable queries. |
+| `INSERT_DATATYPE_PROPORTION` | Field type mix. Choose a deterministic mix matching the case, for example numeric-only for latency cases unless object/text fields are under test. |
+| `CREATE_SCHEMA` | Keep `true` when benchmark should create the schema it writes. If SQL-test creates schema first, ensure benchmark schema settings match it. |
+| `CSV_OUTPUT` | Keep enabled when available so benchmark result CSV can be pulled back as evidence. |
+
+Data volume rule of thumb:
+
+```text
+rows_per_write = DEVICE_NUM_PER_WRITE * BATCH_SIZE_PER_WRITE
+estimated_rows = LOOP * rows_per_write
+estimated_points = estimated_rows * SENSOR_NUMBER
+```
+
+If benchmark distributes rows across multiple tables, compute and document expected rows per table. If the exact distribution is not obvious, query counts per generated table after the write and use those counts as evidence.
+
+Recommended run command:
+
+```bash
+cd "$BENCHMARK_DIR"
+./benchmark.sh -cf "$RUN_CONF_DIR" -heapsize 2G -maxheapsize 4G
+```
+
+Adjust heap sizes based on target data scale and remote memory. Record the exact command in the command inventory and report.
+
+Post-write validation is mandatory:
+
+1. Check benchmark exit code.
+2. Inspect benchmark logs and result CSV under `logs/` and `data/csvOutput/`; report any exception or failed operation count.
+3. Query IoTDB through SQL-test or CLI to confirm the expected database/table exists.
+4. Run `count(*)`, `count(<stable field>)`, or table-specific row-count queries and compare with expected rows.
+5. Run at least one deterministic sample query, such as ordered time-range query with `limit`, to prove data is readable.
+6. Pull benchmark run config, logs, CSV result, validation SQL outputs, and any wrapper stdout/stderr into the local pullback artifact directory.
+
+For cases that delete a large table and recreate a same-name table, use benchmark for the large old-table write and for the recreated-table write if the recreated data is also large. Generate SQL-test `.run` steps that verify table existence, drop/recreate behavior, row counts, sample query correctness, and latency thresholds.
 
 ## Tree/Table Model Configuration
 
@@ -358,18 +454,19 @@ If `Model` is `both`, run the full sequence once for tree and once for table, wi
 3. Lint Markdown and `.run`.
 4. Deploy `.run` to `<SQL_TEST_DIR>/user/scripts/<feature>/<case-name>.run`.
 5. Configure `otf_new.properties` for topology, model, and synchronized `iotdbURL`.
-6. Configure `user/CONFIG/special_query.csv` if any query has volatile columns that should be ignored in `.result`/`.out` comparison.
-7. Set SQL-test execution mode to `setup`. The exact property key must be verified in `otf_new.properties` or `test.sh`; commonly it is a setup/test mode flag.
-8. Run:
+6. For large data setup, configure and run benchmark with a copied run-specific config, then verify inserted row counts before SQL-test comparison.
+7. Configure `user/CONFIG/special_query.csv` if any query has volatile columns that should be ignored in `.result`/`.out` comparison.
+8. Set SQL-test execution mode to `setup`. The exact property key must be verified in `otf_new.properties` or `test.sh`; commonly it is a setup/test mode flag.
+9. Run:
 
 ```bash
 cd "$SQL_TEST_DIR"
 ./test.sh
 ```
 
-9. Collect generated `.result` files and setup logs.
-10. Stop IoTDB on the supplied `1C1D` host, or on all three supplied `3C3D` cluster nodes.
-11. Resolve and verify cleanup paths before deletion:
+10. Collect generated `.result` files and setup logs.
+11. Stop IoTDB on the supplied `1C1D` host, or on all three supplied `3C3D` cluster nodes.
+12. Resolve and verify cleanup paths before deletion:
 
 ```bash
 cd "$IOTDB_DIR"
@@ -377,19 +474,20 @@ pwd
 test -d "$IOTDB_DIR/data" && test -d "$IOTDB_DIR/logs"
 ```
 
-12. Delete only the verified IoTDB data/log directories:
+13. Delete only the verified IoTDB data/log directories:
 
 ```bash
 rm -rf "$IOTDB_DIR/data" "$IOTDB_DIR/logs"
 ```
 
-13. Restart IoTDB on the supplied `1C1D` host, or on all three supplied `3C3D` cluster nodes.
-14. Re-check processes on every restarted node and RPC port `6667` on the SQL-test connection node.
-15. Set SQL-test execution mode to `test`.
-16. Run `./test.sh` again.
-17. Pull back the remote executed `.run`, `.out`, `result.xml`, test logs, `special_query.csv`, and any updated `.result` references needed for diagnosis into the local pullback artifact directory. For `both`, use the model-specific pullback directory.
-18. If the test command exits nonzero, `result.xml` reports failures, or any `.out` contains `###### COMPARE RESULT : FAIL ######`, automatically run the result masking analysis described below. Do not ask the user to trigger the diff script with another prompt.
-19. Compare case counts and failures before reporting.
+14. Restart IoTDB on the supplied `1C1D` host, or on all three supplied `3C3D` cluster nodes.
+15. Re-check processes on every restarted node and RPC port `6667` on the SQL-test connection node.
+16. Re-run benchmark data generation after restart if the test phase needs large data to exist in the clean environment, then verify row counts again.
+17. Set SQL-test execution mode to `test`.
+18. Run `./test.sh` again.
+19. Pull back the remote executed `.run`, `.out`, `result.xml`, test logs, benchmark run config/logs/CSV, `special_query.csv`, and any updated `.result` references needed for diagnosis into the local pullback artifact directory. For `both`, use the model-specific pullback directory.
+20. If the test command exits nonzero, `result.xml` reports failures, or any `.out` contains `###### COMPARE RESULT : FAIL ######`, automatically run the result masking analysis described below. Do not ask the user to trigger the diff script with another prompt.
+21. Compare case counts and failures before reporting.
 
 Do not skip the restart and cleanup between setup and test unless the user explicitly requests a faster non-isolated run.
 
@@ -466,6 +564,7 @@ Pull back these artifacts when present:
 *.out
 result.xml
 special_query.csv
+benchmark config/logs/result CSV
 *.log
 wrapper stdout/stderr
 export directories or validation summaries
@@ -479,6 +578,7 @@ Reports must stay short. Fill only:
 
 - Requirement, version, execution date, topology, model, execution environment.
 - IoTDB directory, SQL-test directory, executed script, remote command, log paths, artifact paths.
+- Benchmark directory, benchmark config path, benchmark command, expected row count, actual verified row count when large data is used.
 - Total, passed, failed, blocked, not run, pass rate, conclusion.
 - Failure detail rows, or `无`.
 - Screenshot/evidence image paths.

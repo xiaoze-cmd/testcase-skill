@@ -14,6 +14,7 @@
 - Markdown 静态检查通过后，自动生成 `.run` 文件
 - 按用户指定的本地目录保存 Markdown 用例和本地生成的 `.run`
 - 根据用户传入的 IoTDB 安装目录和 SQL-test 工具目录做远端检查
+- 涉及大数据量写入时使用 benchmark 生成数据，不在 `.run` 中展开海量 `INSERT`
 - 支持 `1C1D` 和 `3C3D` 两种执行拓扑
 - 支持树模型和表模型，两者配置不同
 - `3C3D` 需要提供三台集群节点地址和可用 SSH key；清理、停止、重启会覆盖三台节点
@@ -61,6 +62,7 @@ Use $iotdb-sql-testcase-pipeline.
 | 本地拉回产物目录 | `<本地保存远端 .run、.result、.out、result.xml、日志等产物的目录>` |
 | IoTDB 安装目录 | `/data/iotdb-enterprise-xxx/iotdb-enterprise-xxx-bin` |
 | SQL-test 工具目录 | `/data/iotdb-sql-test-master` |
+| Benchmark 工具目录 | 大数据量/性能场景填写，例如 `/data/iot-benchmark-iotdb-2.0`，默认在 SQL-test 执行主机上运行 |
 | SQL-test 执行主机 | `<SQL-test 所在主机 IP>` |
 | 1C1D 主机 | `<1C1D 主机 IP>` |
 | 3C3D 集群节点 | `<三个集群节点 IP 或主机名>` |
@@ -69,6 +71,8 @@ Use $iotdb-sql-testcase-pipeline.
 
 Codex 会先验证传入的 IoTDB 目录和 SQL-test 目录，再执行后续操作；不会优先使用旧记忆里的路径覆盖用户传入的路径。
 针对 `3C3D` 集群测试，需要提供三台节点地址。SQL-test 连接仍然只使用配置文件中的一个 `dn_rpc_address:6667`，但停止、清理 `data/logs`、重启必须在三台节点上都执行。
+
+如果需求涉及“大数据量”“大表”“性能延时”“百万/千万级写入”等场景，建议在 prompt 中提供 Benchmark 工具目录。默认认为 benchmark 在 SQL-test 执行主机上；如果 benchmark 在其他机器上，需要额外写明 Benchmark 执行主机。Codex 会优先使用 benchmark 写入数据，自动复制并修改本次运行专用的 `conf/config.properties`，启动或检查 IoTDB 后执行写入，并在写入完成后用 SQL-test 或 CLI 查询校验数据是否成功写入。
 
 ## 本地产物目录
 
@@ -86,6 +90,36 @@ Codex 会先验证传入的 IoTDB 目录和 SQL-test 目录，再执行后续操
 ```
 
 也就是说：先在本地用例文件目录生成 Markdown 和 `.run`，再把 `.run` 部署到 SQL-test 目录执行，执行完后再把远端实际执行的 `.run` 和结果文件一起拉回本地拉回产物目录。
+
+大数据量场景还会拉回 benchmark 的本次运行配置、日志和 CSV 结果文件，用于证明写入规模和执行结果。
+
+## Benchmark 大数据写入
+
+当用例需要构造大量数据时，`.run` 只负责 DDL、查询校验和清理，数据写入由 benchmark 完成。常见 Benchmark 工具目录示例：
+
+```text
+/data/iot-benchmark-iotdb-2.0
+/data/iot-benchmark-2.0/iot-benchmark-iotdb-2.0
+/data/iot-benchmark-v2/iot-benchmark-iotdb-2.0
+```
+
+Codex 会自行检查 benchmark 目录下的 `benchmark.sh`、`bin/startup.sh`、`conf/config.properties`，复制一份本次运行专用配置，并根据需求修改关键参数，例如：
+
+- `IoTDB_DIALECT_MODE=table` 或 `tree`
+- `HOST=<dn_rpc_address>`、`PORT=6667`
+- `DB_NAME=<测试数据库>`
+- `LOOP`、`DEVICE_NUMBER`、`SENSOR_NUMBER`
+- `IoTDB_TABLE_NAME_PREFIX`、`IoTDB_TABLE_NUMBER`
+- `BATCH_SIZE_PER_WRITE`、`DEVICE_NUM_PER_WRITE`
+- `OPERATION_PROPORTION=1:0:0:0:0:0:0:0:0:0:0:0`
+
+写入完成后，Codex 必须校验：
+
+- benchmark 退出码和日志无异常。
+- benchmark 结果 CSV 已生成。
+- 目标 database/table 存在。
+- `count(*)` 或 `count(<稳定字段>)` 与预期写入规模一致。
+- 至少一条确定性样例查询可以读到数据。
 
 ## 默认检索官方用户手册
 
@@ -228,6 +262,7 @@ SSH 用户：<ubuntu 或其他用户>
 SSH key：<IOTDB_SSH_KEY 或本地 key 路径>
 IoTDB 安装目录：<远端 IoTDB 安装目录>
 SQL-test 工具目录：<远端 /data/iotdb-sql-test-master 等目录>
+Benchmark 工具目录：<大数据量/性能场景填写；不涉及可填“无”；默认在 SQL-test 执行主机上>
 
 需求：
 <粘贴需求、设计文档或 issue 内容；官网链接可选>
@@ -255,6 +290,7 @@ SSH key 节点 2：<IOTDB_SSH_KEY、本地 key 路径，或共用 key>
 SSH key 节点 3：<IOTDB_SSH_KEY、本地 key 路径，或共用 key>
 IoTDB 安装目录：<远端 IoTDB 安装目录>
 SQL-test 工具目录：<远端 /data/iotdb-sql-test-master 等目录>
+Benchmark 工具目录：<大数据量/性能场景填写；不涉及可填“无”；默认在 SQL-test 执行主机上>
 
 需求：
 <粘贴需求、设计文档或 issue 内容；官网链接可选>
@@ -291,6 +327,7 @@ skills/
 - Markdown 用例是 `.run` 文件的来源，不能跳过。
 - 面向用户的过程说明、步骤、结果、失败原因、确认选项和报告正文都应使用中文；不要把执行过程总结成英文。
 - 默认是 Markdown 检查通过后自动生成 `.run`。
+- 大数据量/性能场景应使用 benchmark 写入数据，`.run` 不应展开海量 `INSERT`。
 - Markdown 用例和本地生成的 `.run` 放在“本地用例文件目录”；远端实际执行的 `.run` 必须放在 SQL-test 工具目录的 `user/scripts/<feature>/` 下。
 - 模型类型是 `both` 时必须拆成 tree/table 两套 Markdown、两套 `.run`、两套产物目录；完整执行需要四次 SQL-test：tree setup、tree test、table setup、table test。
 - `3C3D` 必须提供三台节点地址和可用 SSH key。SQL-test 只连接一个 `dn_rpc_address:6667`，但停止、清理、重启要覆盖三台节点。

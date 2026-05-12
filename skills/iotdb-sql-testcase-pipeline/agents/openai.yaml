@@ -1,7 +1,7 @@
 interface:
   display_name: "IoTDB SQL 用例流水线"
   short_description: "生成 SQL 用例、.run，并执行 setup/test"
-  default_prompt: "按 IoTDB/TimechoDB SQL 用例流水线处理：根据需求默认检索官方手册，先生成 Markdown，再生成 .run；可按 1C1D/3C3D、tree/table/both 执行 setup/test、清理重启、产物拉回和报告生成；COMPARE RESULT 失败时自动分析 .result/.out 与 special_query.csv 候选列。所有用户可见说明使用中文。"
+  default_prompt: "按 IoTDB/TimechoDB SQL 用例流水线处理：根据需求默认检索官方手册，先生成 Markdown，再生成 .run；大数据量场景使用 benchmark 写入并校验数据量；可按 1C1D/3C3D、tree/table/both 执行 setup/test、清理重启、产物拉回和报告生成；COMPARE RESULT 失败时自动分析 .result/.out 与 special_query.csv 候选列。所有用户可见说明使用中文。"
 
 policy:
   allow_implicit_invocation: true
