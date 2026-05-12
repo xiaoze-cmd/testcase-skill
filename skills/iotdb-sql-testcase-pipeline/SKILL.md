@@ -1,6 +1,6 @@
 ---
 name: iotdb-sql-testcase-pipeline
-description: Use when Codex needs to turn IoTDB/TimechoDB SQL requirements, design docs, issues, or official manual topics into detailed Markdown cases and .run files, or operate 1C1D/3C3D SQL-test environments from provided IoTDB and sql-test directories, including default official manual lookup, 3C3D all-node cleanup/restart, tree/table config, rpc_address/iotdbURL sync, special_query.csv result masking, setup/test runs, restarts, artifact collection, reports, or screenshots.
+description: Use when Codex needs to turn IoTDB/TimechoDB SQL requirements, design docs, issues, or official manual topics into detailed Markdown cases and .run files, or operate 1C1D/3C3D SQL-test/benchmark environments from provided IoTDB, sql-test, and benchmark directories, including large-data writes, setup/test runs, tree/table config, result masking, artifacts, reports, or screenshots.
 ---
 
 # IoTDB SQL Testcase Pipeline
@@ -29,7 +29,7 @@ Keep commands, file paths, SQL statements, configuration keys, log excerpts, err
 
 ## Workflow
 
-1. Collect the requirement text, version directory, target topology (`1C1D` or `3C3D`), target model (`table`, `tree`, or both), optional official documentation links, local case artifact directory, local pullback artifact directory, IoTDB node hosts, SQL-test runner host, SSH user/key for each node or one confirmed shared key, remote IoTDB install directory, and SQL-test tool directory. If the user passes the IoTDB directory and SQL-test directory, treat those as the first paths to verify and execute against. For `3C3D`, require all three cluster node hosts so stop, cleanup, and restart can run on every node.
+1. Collect the requirement text, version directory, target topology (`1C1D` or `3C3D`), target model (`table`, `tree`, or both), optional official documentation links, local case artifact directory, local pullback artifact directory, IoTDB node hosts, SQL-test runner host, SSH user/key for each node or one confirmed shared key, remote IoTDB install directory, SQL-test tool directory, and benchmark tool directory when large-volume data generation is needed. If the user does not specify a benchmark runner host, use the SQL-test runner host. If the user passes the IoTDB, SQL-test, or benchmark directory, treat those as the first paths to verify and execute against. For `3C3D`, require all three cluster node hosts so stop, cleanup, and restart can run on every node.
 2. Search the official manual by default:
    - Tree model: `https://www.timecho.com/docs/zh/UserGuide/latest/`
    - Table model: `https://www.timecho.com/docs/zh/UserGuide/latest-Table/`
@@ -55,16 +55,17 @@ Keep commands, file paths, SQL statements, configuration keys, log excerpts, err
    - Table model uses `jdbc:iotdb://<rpc_address>:6667?version=V_1_0&sql_dialect=table`.
    - Tree model uses exactly `jdbc:iotdb://<rpc_address>:6667`; remove `?version=...` and any other query parameters.
 10. Configure `user/CONFIG/special_query.csv` before setup mode when generated cases contain known volatile result columns such as time, query IDs, elapsed time, region IDs, build info, usage, or other environment-dependent columns. Back up the CSV first, then add `SQL;ColumnName;ColumnName` entries that exactly match the query text used in `.run`.
-11. Deploy the executable `.run` to the target SQL-test directory using SSH key authentication or an existing secure runtime configuration. The `.run` that SQL-test executes must be under `<SQL_TEST_DIR>/user/scripts/<feature>/<case-name>.run`.
-12. Execute the two-phase automation flow when the user asks for full execution:
+11. For large data setup, use benchmark instead of expanding `.run` with massive `INSERT` statements. Verify the benchmark directory, create a run-specific copied config directory, update benchmark `config.properties` for topology/model/RPC/data scale/table prefix, start or verify IoTDB first, run benchmark, then verify the inserted row count through SQL-test or the IoTDB CLI before continuing.
+12. Deploy the executable `.run` to the target SQL-test directory using SSH key authentication or an existing secure runtime configuration. The `.run` that SQL-test executes must be under `<SQL_TEST_DIR>/user/scripts/<feature>/<case-name>.run`.
+13. Execute the two-phase automation flow when the user asks for full execution:
    - Set SQL-test mode to `setup`, execute, and collect `.result` artifacts.
    - Stop IoTDB on the supplied `1C1D` host, or on all three supplied `3C3D` cluster nodes.
    - Clean only the verified IoTDB `data/` and `logs/` directories on each node being restarted.
    - Restart IoTDB, re-check RPC port `6667` on the SQL-test connection node, set SQL-test mode to `test`, execute again, and collect `.out`, `result.xml`, and logs.
    - For model `both`, run this full two-phase flow separately for tree and table: tree `setup`, clean/restart, tree `test`, then reconfigure SQL-test for table, table `setup`, clean/restart, table `test`. This means four SQL-test executions total.
-13. If the test run exits nonzero, `result.xml` reports failures, or `.out` contains `###### COMPARE RESULT : FAIL ######`, automatically pair the relevant `.result` and `.out` files and run `scripts/suggest_special_query_masks.py`. State the exact SQL and differing result columns, then ask only for the user's decision: re-run comparison, or append/merge suggested mask columns into `special_query.csv`.
-14. Pull back the deployed `.run`, `.result`, `.out`, `result.xml`, logs, wrapper output, `special_query.csv`, and any exported data summaries needed for validation into the local pullback artifact directory.
-15. Fill `execution-report.md` using the fixed template. Include only metrics, paths, conclusion, failure rows, notes, and screenshots/evidence images.
+14. If the test run exits nonzero, `result.xml` reports failures, or `.out` contains `###### COMPARE RESULT : FAIL ######`, automatically pair the relevant `.result` and `.out` files and run `scripts/suggest_special_query_masks.py`. State the exact SQL and differing result columns, then ask only for the user's decision: re-run comparison, or append/merge suggested mask columns into `special_query.csv`.
+15. Pull back the deployed `.run`, `.result`, `.out`, `result.xml`, benchmark run config, benchmark logs/results, SQL-test logs, wrapper output, `special_query.csv`, and any exported data summaries needed for validation into the local pullback artifact directory.
+16. Fill `execution-report.md` using the fixed template. Include only metrics, paths, conclusion, failure rows, notes, and screenshots/evidence images.
 
 ## Remote Defaults
 
@@ -80,6 +81,7 @@ When the user does not provide a different environment, use the repository memor
 - Local pullback artifact directory: user-provided path, or `<local case artifact directory>/artifacts/`.
 - SQL automation root: `/data/iotdb-sql-test-master`
 - Script upload path: `/data/iotdb-sql-test-master/user/scripts/<feature>/<case-name>.run`
+- Benchmark candidate roots: `/data/iot-benchmark-iotdb-2.0`, `/data/iot-benchmark-2.0/iot-benchmark-iotdb-2.0`, `/data/iot-benchmark-v2/iot-benchmark-iotdb-2.0`
 
 Treat these as defaults, not facts. Verify active paths and configs on the remote host before execution.
 
@@ -97,6 +99,7 @@ Treat these as defaults, not facts. Verify active paths and configs on the remot
 - For model `both`, generate and execute separate tree and table artifacts. Do not run one mixed `.run`, do not reuse one SQL-test config, and do not let one model's `.result` become the other model's baseline.
 - Keep DataNode `dn_rpc_address` and SQL-test `iotdbURL` synchronized. The RPC port is fixed to `6667`; SQL-test should connect to `jdbc:iotdb://<dn_rpc_address>:6667...` for table mode and exactly `jdbc:iotdb://<dn_rpc_address>:6667` for tree mode.
 - Use `special_query.csv` for column-level result masking when only some output columns are unstable. Do not replace a deterministic query with `<<CHECKCODE;` just to hide one volatile column.
+- For large-data setup, use benchmark to write data and keep `.run` focused on DDL, query assertions, and validation. Do not generate hundreds of thousands or millions of literal `INSERT` rows in `.run`.
 - When `###### COMPARE RESULT : FAIL ######` appears, automatically compare `.result` and `.out` with `scripts/suggest_special_query_masks.py`; do not ask the user to provide a new prompt for the diff helper. List the exact SQL and real differing result-table columns, then offer two choices: re-run comparison, or append/merge the suggested mask columns into `special_query.csv`. Ignore SQL-test status/footer differences such as `Elapsed Time`; they are not `special_query.csv` columns.
 - Update `special_query.csv` before setup mode so `.result` and `.out` are generated with the same masked columns. If masking is discovered after a mismatch, update the CSV and rerun the full setup -> clean/restart -> test sequence.
 - For performance cases, include data volume, concurrency or loop count, warm-up behavior, measured metric, threshold/baseline rule, cleanup policy, and remote output path.
