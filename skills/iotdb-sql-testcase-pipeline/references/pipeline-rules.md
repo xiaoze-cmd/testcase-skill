@@ -164,6 +164,31 @@ Atomicity rules:
 - If the requirement changes a data path, include DML/query validation. Metadata checks alone are not sufficient.
 - If a point is not automatable in SQL-test, generate an explicit design case with trigger action, required environment, expected evidence, blocking reason, and any wrapper/benchmark option.
 
+After the matrix, create a `测试点展开表`. Do not skip this table for non-trivial requirements.
+
+Minimum expansion columns:
+
+| Column | Requirement |
+|------|-------------|
+| 测试点编号 | The parent TP ID. |
+| 子场景编号 | Stable child ID, for example `TP-SQL-037-A`. |
+| 子场景类型 | Positive, negative, boundary, permission, config, syntax, sync, cluster, performance, audit, or cleanup. |
+| 子场景说明 | One concrete setup/action/assertion path. |
+| 生成用例编号 | The final TC ID generated from this child scenario. |
+| 是否自动化 | `.run`, wrapper, benchmark, remote command, design-only, or blocked. |
+| 展开依据 | Why this child case exists, such as permission scope, syntax variant, config value, or source/target state. |
+
+Expansion rules:
+
+- `测试点` is not equal to `用例`. A TP may produce one TC only if it contains one action, one data set, one assertion, no variants, no paired result, and no environment difference.
+- If a TP includes multiple values or words such as `分别`, `任一`, `多种`, `多类`, `多个`, `同时`, `两种`, `三种`, `四类`, `对象级/DB级/ANY`, `true/false`, `开启/关闭`, `旧值/新值`, `源端/接收端`, `DROP VIEW/DROP TABLE`, `ALTER TABLE/ALTER VIEW`, `冷/热`, `单行/批量/并发`, `缺任一权限`, `pattern/privilege`, or `skipIfNoPrivileges`, it must normally produce multiple child scenarios and multiple cases.
+- Permission TPs expand by role/user type, privilege scope, operation, security mode, granted state, denied state, user switch/login, and cleanup.
+- Config TPs expand by each switch value and transition path: default, explicit, true, false, true->false, false->true, valid, invalid.
+- DDL syntax TPs expand by command entry and object state: `DROP VIEW`, `DROP TABLE`, `IF EXISTS`, no `IF EXISTS`, existing object, missing object, `ALTER VIEW`, `ALTER TABLE`.
+- Sync/Pipe TPs expand by source object, target object, pattern, privilege, cascade setting, target existence, and failure mode.
+- Performance TPs expand by workload shape: query type, cold/hot run, single/batch/concurrent write, data scale, metric, threshold, benchmark config, and evidence path.
+- The coverage self-review must report total TP count, expanded child-scenario count, final TC count, complex TP IDs that expanded to more than one TC, and any remaining TP->TC one-to-one mappings with reasons.
+
 Use a Markdown table. The minimum required columns are:
 
 | Column | Requirement |
