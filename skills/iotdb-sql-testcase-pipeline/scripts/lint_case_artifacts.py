@@ -30,8 +30,45 @@ REQUIRED_MD_COLUMNS = [
 
 TEST_POINT_ID_RE = re.compile(r"\b(?:TP|[A-Z]+-TP|TP-SQL)-\d+\b")
 CASE_ID_RE = re.compile(r"\b(?:TC|[A-Z]+-TC|TC-SQL)-\d+\b")
+SUBSCENARIO_ID_RE = re.compile(r"\b(?:TP|[A-Z]+-TP|TP-SQL)-\d+-[A-Z0-9]+\b")
 DEFERRED_TERMS = ["后续专项", "人工验证", "不纳入本轮", "暂不纳入", "后续验证"]
 DEFERRED_REQUIRED_TERMS = ["阻塞原因", "无法自动化", "触发动作", "证据", "验证方式", "wrapper", "benchmark", "远端命令"]
+EXPANSION_TABLE_TERMS = ["测试点展开表", "子场景编号", "子场景类型", "展开依据"]
+COMPLEX_TP_TRIGGERS = [
+    "分别",
+    "任一",
+    "多种",
+    "多类",
+    "多个",
+    "同时",
+    "两种",
+    "三种",
+    "四类",
+    "对象级",
+    "DB级",
+    "DB 级",
+    "ANY",
+    "true/false",
+    "开启/关闭",
+    "旧值",
+    "新值",
+    "源端",
+    "接收端",
+    "发送端",
+    "DROP VIEW",
+    "DROP TABLE",
+    "ALTER TABLE",
+    "ALTER VIEW",
+    "冷/热",
+    "单行",
+    "批量",
+    "并发",
+    "缺任一",
+    "pattern",
+    "privilege",
+    "skipIfNoPrivileges",
+    "正向/反向",
+]
 
 SECRET_PATTERNS = [
     re.compile(r"IoTDB@\d{4,}", re.IGNORECASE),
@@ -59,6 +96,25 @@ def markdown_rows(text: str) -> list[list[str]]:
     return [row for row in (split_md_row(line) for line in text.splitlines()) if row]
 
 
+def is_test_point_row(row: list[str]) -> bool:
+    return bool(row and TEST_POINT_ID_RE.fullmatch(row[0]))
+
+
+def is_case_row(row: list[str]) -> bool:
+    return bool(row and CASE_ID_RE.fullmatch(row[0]))
+
+
+def is_complex_test_point(row: list[str]) -> bool:
+    text = "|".join(row)
+    if any(trigger in text for trigger in COMPLEX_TP_TRIGGERS):
+        return True
+    if "权限" in text and any(term in text for term in ["CREATE", "DROP", "ALTER", "SELECT", "INSERT", "DELETE", "SYSTEM", "三权分立", "角色"]):
+        return True
+    if any(term in text for term in ["Pipe", "同步", "性能", "benchmark", "Benchmark", "集群"]) and any(term in text for term in ["需要", "对比", "差异", "状态", "权限", "级联"]):
+        return True
+    return False
+
+
 def lint_md(path: Path) -> list[str]:
     text = path.read_text(encoding="utf-8-sig")
     issues = check_no_secrets(path, text)
@@ -69,7 +125,8 @@ def lint_md(path: Path) -> list[str]:
         if col not in header_line:
             issues.append(f"{path}: 缺少必需 Markdown 列：{col}")
 
-    case_rows = [row for row in rows if row and CASE_ID_RE.fullmatch(row[0])]
+    tp_rows = [row for row in rows if is_test_point_row(row)]
+    case_rows = [row for row in rows if is_case_row(row)]
     case_count = len(case_rows)
     if case_count == 0 and not CASE_ID_RE.search(text):
         issues.append(f"{path}: 没有找到稳定的 TC-* 用例编号")
@@ -93,6 +150,27 @@ def lint_md(path: Path) -> list[str]:
         mapped = TEST_POINT_ID_RE.findall("|".join(row))
         if len(set(mapped)) > 3:
             issues.append(f"{path}: {row[0]} 关联测试点过多，疑似把多个独立规则合并到一条用例")
+
+    complex_tp_rows = [row for row in tp_rows if is_complex_test_point(row)]
+    if complex_tp_rows and not any(term in text for term in EXPANSION_TABLE_TERMS):
+        issues.append(f"{path}: 存在复杂测试点，但缺少测试点展开表/子场景编号，容易机械生成 1 个 TP 对 1 个 TC")
+
+    if complex_tp_rows:
+        tp_to_cases: dict[str, set[str]] = {row[0]: set() for row in tp_rows}
+        for row in case_rows:
+            case_id = row[0]
+            mapped = set(TEST_POINT_ID_RE.findall("|".join(row[1:])))
+            for tp_id in mapped:
+                tp_to_cases.setdefault(tp_id, set()).add(case_id)
+        one_to_one_complex = [row[0] for row in complex_tp_rows if len(tp_to_cases.get(row[0], set())) <= 1]
+        if one_to_one_complex and "一对一合理性" not in text and "1:1 合理性" not in text:
+            sample = ", ".join(one_to_one_complex[:8])
+            extra = "..." if len(one_to_one_complex) > 8 else ""
+            issues.append(f"{path}: 复杂测试点仅对应 0/1 条用例，疑似未展开子场景：{sample}{extra}")
+
+    subscenario_ids = set(SUBSCENARIO_ID_RE.findall(text))
+    if subscenario_ids and case_count and len(subscenario_ids) > case_count:
+        issues.append(f"{path}: 子场景数量多于用例数量，疑似部分子场景没有生成对应用例")
 
     if any(term in text for term in DEFERRED_TERMS) and not any(term in text for term in DEFERRED_REQUIRED_TERMS):
         issues.append(f"{path}: 存在后续专项/人工验证描述，但缺少阻塞原因、触发动作或证据计划")
