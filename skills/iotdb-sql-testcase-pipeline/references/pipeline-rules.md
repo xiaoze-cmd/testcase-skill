@@ -139,6 +139,31 @@ Prefer the user-supplied benchmark path over discovered candidates.
 
 Generate Markdown first from the user material plus the official manual lookup. Save it under the local case artifact directory. The normal full pipeline is automatic: create the Markdown table, self-review and lint it, then generate `.run` without waiting for a separate manual review unless the user requested Markdown-only or review-only mode.
 
+Before writing case rows, create a separate `测试点矩阵`. This matrix is not a summary; it is the design source for the cases.
+
+Minimum matrix columns:
+
+| Column | Requirement |
+|------|-------------|
+| 测试点编号 | Stable ID, for example `TP-SQL-001`. |
+| 功能/规则 | One independently testable rule, not a broad feature area. |
+| 影响面 | SQL syntax, DDL, DML, query, metadata, system table, permission, config, cluster, Pipe, performance, tool, or compatibility. |
+| 正向场景 | The successful action that proves the rule. |
+| 反向/异常场景 | Invalid input, missing object, denied permission, disabled config, type mismatch, unsupported syntax, or failure path. |
+| 边界/组合场景 | Default/explicit values, NULL/empty data, old/new syntax, partial columns, source/target combinations, model/topology differences. |
+| 权限/配置/模型/集群差异 | Required privilege, config switch, tree/table difference, 1C1D/3C3D difference, source/target side difference. |
+| 测试数据 | Concrete database, table/timeseries, rows, columns, tags, timestamps, volume, and boundary values. |
+| 验证方式 | Exact SQL/action, expected rows/counts/metadata/error/metric, and artifact evidence. |
+| 自动化备注 | SQL-test `.run`, wrapper, benchmark, remote command, manual evidence, or blocking reason. |
+
+Atomicity rules:
+
+- Split broad categories such as permission, configuration, sync/Pipe, cluster, performance, and metadata display into separate rows by operation, role, scope, switch value, model, topology, and source/target state.
+- Do not mark a requirement as covered just because a sentence appears in a case. Coverage requires an executable action, concrete data, a stable assertion, and cleanup.
+- A case should normally map to one primary test point. If one case covers multiple test points, each point must have its own setup/action/assertion inside the steps.
+- If the requirement changes a data path, include DML/query validation. Metadata checks alone are not sufficient.
+- If a point is not automatable in SQL-test, generate an explicit design case with trigger action, required environment, expected evidence, blocking reason, and any wrapper/benchmark option.
+
 Use a Markdown table. The minimum required columns are:
 
 | Column | Requirement |
@@ -146,10 +171,12 @@ Use a Markdown table. The minimum required columns are:
 | 用例编号 | Stable ID, for example `TC-SQL-001`. |
 | 用例名称 | Exact validation point. |
 | 用例级别 | `P0`, `P1`, or `P2`. |
+| 一级分类 | Major feature category, for example query, permissions, metadata, sync, performance, tool, table model, or tree model. |
 | 模块类型 | Query, auth, function, table model, tree model, cluster, Pipe, tool, performance, etc. |
 | 二级分类 | More specific category. |
 | 需求来源 | Requirement, design doc, issue, and relevant official manual section or URL. |
 | 前置条件 | Topology, cluster state, permissions, config, model type. |
+| 操作数据 | Exact database/table/timeseries/user/pipe/file/config names and input rows or values. |
 | 测试数据 | Database, table/timeseries, inserted rows, boundary values. |
 | 操作步骤 | Expanded setup, data prep, execution, validation, cleanup. |
 | 预期结果 | Exact row count, fields, ordering, error keyword, file count, or metric rule. |
@@ -158,7 +185,9 @@ Use a Markdown table. The minimum required columns are:
 | 测试结果 | Fill after execution. |
 | 截图 | Fill after execution when needed. |
 
-Coverage should include P0 positive flows, P1 boundaries/combinations/empty data/NULL/permissions, and P2 errors/compatibility/cluster scenarios. Permission cases must include user creation, grant, login/switch user, verification, and cleanup.
+Coverage should include P0 positive flows, P1 boundaries/combinations/empty data/NULL/permissions/config differences, and P2 errors/compatibility/cluster/performance scenarios. Permission cases must include user creation, grant, login/switch user, verification, negative attempt where meaningful, and cleanup.
+
+Generate a coverage self-review after the table. It must list missing or intentionally non-automated points, metadata-only validations, missing negative cases, missing permission/config/model/cluster differences, and assumptions. If the self-review finds a preventable gap, revise the matrix and table before generating `.run`.
 
 Performance cases must not be simplified. Include data scale, generation method, warm-up, measured iterations, metric, threshold/baseline rule, raw output path, and cleanup/retention policy.
 

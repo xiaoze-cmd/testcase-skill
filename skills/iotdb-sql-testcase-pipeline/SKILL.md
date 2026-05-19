@@ -31,13 +31,18 @@ Keep commands, file paths, SQL statements, configuration keys, log excerpts, err
 
 Before generating Markdown cases, perform a real test-design analysis. This is a hard gate: do not jump from requirement text directly to case rows.
 
-1. Decompose the requirement into a `测试点矩阵` first. Include at least: `测试点编号`, `功能/规则`, `影响面`, `正向场景`, `反向/异常场景`, `边界/组合场景`, `权限/配置/模型/集群差异`, `测试数据`, `验证方式`, `稳定性与预期`, and `自动化备注`.
-2. Analyze behavior, not just wording. Identify what changed in SQL syntax, data reads/writes, metadata, permissions, configuration, cluster behavior, sync, system tables, performance, compatibility, and failure handling.
-3. For every functional claim, ask what observable action proves it. If the feature is about write, delete, query, sync, permissions, configuration, restart, or performance, the case must execute that action and verify the real outcome. `SHOW`, `DESC`, and system-table queries prove metadata only; they cannot substitute for data-path validation.
-4. Design paired coverage where meaningful: success/failure, enabled/disabled, with/without permission, valid/invalid input, existing/missing object, default/explicit config, single-node/cluster, source/target side, old/new syntax, and normal/boundary/extreme data.
-5. Preserve detail when mapping test points to cases. Do not collapse multiple detailed test points into one vague case unless the case still contains separate setup, actions, assertions, and expected results for each sub-point.
-6. Prefer stable assertions. Use exact rows, counts, metadata fields, object existence, SQLSTATE, error code, or stable keywords. Do not depend on complete localized error text when wording may switch between English and Chinese.
-7. List open questions and assumptions before case generation. If ambiguity affects correctness, either ask the user or generate cases under explicit conservative assumptions.
+1. Decompose the requirement into an atomic `测试点矩阵` first. Include at least: `测试点编号`, `功能/规则`, `影响面`, `正向场景`, `反向/异常场景`, `边界/组合场景`, `权限/配置/模型/集群差异`, `测试数据`, `验证方式`, `稳定性与预期`, and `自动化备注`.
+2. Atomic means one observable rule per row. Do not use broad rows such as "权限控制", "Pipe 同步", "配置校验", "性能测试", or "元数据展示" if they contain multiple roles, operations, syntax variants, config values, model differences, or source/target states. Split them until each row can be proven by a concrete action and assertion.
+3. Analyze behavior, not just wording. Identify what changed in SQL syntax, DDL, DML, query path, data reads/writes, metadata, system tables, permissions, configuration, restart/reload behavior, cluster behavior, Pipe/sync, performance, compatibility, and failure handling.
+4. Apply the generic coverage checklist to every requirement unless it is clearly irrelevant: syntax variants, positive data path, negative/error path, boundary values, NULL/empty data, default vs explicit values, permission grants/denials, config on/off or old/new value, tree/table model difference, single-node/cluster difference, source/target side behavior, compatibility with old syntax, performance/large-data impact, audit/log/error message behavior, and cleanup.
+5. For every functional claim, ask what observable action proves it. If the feature is about write, delete, update, query, sync, permissions, configuration, restart, performance, or tools, the case must execute that action and verify the real outcome. `SHOW`, `DESC`, and system-table queries prove metadata only; they cannot substitute for data-path validation.
+6. Design paired coverage where meaningful: success/failure, enabled/disabled, with/without permission, valid/invalid input, existing/missing object, default/explicit config, single-node/cluster, source/target side, old/new syntax, and normal/boundary/extreme data.
+7. Preserve detail when mapping test points to cases. Do not collapse multiple detailed test points into one vague case. A generated case should normally map to one primary test point; if it maps to multiple IDs, it must contain separate setup, action, assertion, and expected result for each sub-point.
+8. Permission-related requirements must be expanded as a matrix: role/user type, privilege scope such as object/database/ANY, operation type such as CREATE/DROP/ALTER/SELECT/INSERT/DELETE, enabled/disabled security mode when relevant, grant path, user switch/login, positive attempt, negative attempt, and cleanup.
+9. Sync, Pipe, cluster, benchmark, audit, and performance points must not be silently downgraded to "后续专项" or "人工验证". If they cannot be automated in SQL-test, still generate explicit design cases with required environment, trigger action, evidence, and blocking reason. If they can be automated by wrapper/remote commands/benchmark, generate those artifacts instead of dropping the coverage.
+10. Prefer stable assertions. Use exact rows, counts, metadata fields, object existence, SQLSTATE, error code, or stable keywords. Do not depend on complete localized error text when wording may switch between English and Chinese.
+11. After generating the matrix but before generating case rows, run a coverage self-review and state gaps: untested requirement rules, metadata-only proof where data-path proof is required, missing negative cases, missing permission/config/model/cluster differences, non-automated cases, and assumptions.
+12. List open questions and assumptions before case generation. If ambiguity affects correctness, either ask the user or generate cases under explicit conservative assumptions.
 
 ## Workflow
 
@@ -52,7 +57,7 @@ Before generating Markdown cases, perform a real test-design analysis. This is a
    - IoTDB directory contains expected `conf/` and `sbin/` files.
    - SQL-test directory contains `test.sh`, `user/CONFIG/otf_new.properties`, `user/scripts/`, and `user/result/`.
    - For `3C3D`, verify SSH and the supplied IoTDB directory on all three cluster nodes, and choose the SQL-test runner host explicitly.
-5. Generate the `测试点矩阵` first, self-review it for missing positive/negative/boundary/permission/config/model/cluster coverage, then generate the detailed Markdown table case file from that matrix. In the normal automatic flow, do not wait for a separate manual review before `.run` generation unless the user asked for "Markdown only" or "review first".
+5. Generate the atomic `测试点矩阵` first, self-review it for missing positive/negative/boundary/permission/config/model/cluster/sync/performance coverage, then generate the detailed Markdown table case file from that matrix. In the normal automatic flow, do not wait for a separate manual review before `.run` generation unless the user asked for "Markdown only" or "review first".
 6. Generate the automation artifact that matches the target:
    - `.run` for SQL automation tool flows.
    - Shell/PowerShell wrapper when the tested behavior is a tool command such as `export-data.sh`.
@@ -60,10 +65,12 @@ Before generating Markdown cases, perform a real test-design analysis. This is a
 7. Run static checks:
    - Markdown table has the required columns.
    - Every case maps to one or more test-point matrix IDs.
+   - The matrix is not over-compressed: broad categories are split into independently verifiable rows, and one case does not hide many unrelated test points.
    - Every automated case has setup, execution, assertions, cleanup, and stable expected output.
    - Case title, permissions, SQL actions, and expected result are consistent. For example, a case named for `INSERT/DELETE/SELECT` permissions must grant those permissions and execute those SQL actions; do not replace them with unrelated `DROP` or metadata-only operations.
    - Positive data-behavior cases include direct data validation. For data write/delete/query/sync behavior, verify both the operated object and the affected object when they differ.
    - Metadata-only cases are explicitly labeled as metadata validation and are not used as proof of data behavior.
+   - Permission, config, sync/Pipe, cluster, performance, and tool cases are either automated or explicitly marked with a concrete blocking reason and evidence plan.
    - Long-running or performance cases are clearly marked.
    - No server password or private key material is written to repo files.
 8. Read `conf/iotdb-datanode.properties` and derive the SQL-test JDBC endpoint from `dn_rpc_address` plus fixed port `6667`. If `dn_rpc_address` is edited, update `iotdbURL` in `otf_new.properties` to the same IP before executing.
@@ -104,10 +111,14 @@ Treat these as defaults, not facts. Verify active paths and configs on the remot
 ## Guardrails
 
 - Do not generate detailed cases directly from a requirement summary. First produce and review a test-point matrix; if the matrix is missing, stop and create it.
+- Do not generate a feature-specific shortcut skill or one-off rule set. This skill must handle arbitrary IoTDB/TimechoDB SQL requirements with the generic test-design framework; use examples only to sharpen universal rules.
+- Do not let the test-point matrix become a high-level outline. Split each requirement into independently verifiable rules before generating cases, especially for permissions, config switches, model differences, sync/Pipe, cluster behavior, large data, and error handling.
 - Generate detailed Markdown first, then automatically generate `.run` after static checks pass. If the user asks to skip Markdown, explain that this pipeline requires Markdown as the reviewable source of truth.
 - Do not treat "the requirement sentence is mentioned" as coverage. A case covers a point only when its SQL/action, data, assertion, and expected result directly prove that point.
 - Do not use `SHOW`, `DESC`, or `information_schema` checks to prove data-path behavior. Use them for metadata behavior only, and add direct DML/query/sync validation when the requirement changes data behavior.
 - Do not let case names drift from implementation. If a title says write, delete, query, sync, permission, config, or performance, the steps must execute that behavior and verify its result.
+- Do not mark broad areas as "后续专项", "人工验证", or "本轮不纳入" unless the generated artifact states the blocking reason, required environment, planned trigger action, expected evidence, and whether a wrapper/benchmark/remote command can automate it.
+- Do not accept a generated Markdown table that omits `用例名称`, `一级分类`, `二级分类`, `操作数据`, `清理动作`, `测试结果`, or `截图`. The detailed Markdown table is the source of truth for `.run` generation.
 - Do not require the user to provide official documentation links. Search the official manuals by default and cite relevant manual sections when they influence coverage or expected results. If network access is unavailable, state that gap in the report or final response.
 - Do not overwrite `.result` baselines unless the user explicitly asks for setup/baseline generation or full setup/test execution and the version/environment is intentionally under test.
 - Do not delete remote IoTDB `data` or `logs` directories unless the user explicitly asks for the setup/test clean restart flow. Before deletion, resolve the absolute paths and verify they are exactly under the supplied IoTDB install directory.
