@@ -1,43 +1,38 @@
 # testcase-skill
 
-This repository contains a Codex skill for IoTDB/TimechoDB SQL test-case generation.
+本仓库包含一个面向 IoTDB/TimechoDB SQL 测试用例生成的 Codex skill。
 
-## Skill name
+## Skill 名称
 
 `iotdb-sql-testcase-pipeline`
 
-This skill turns IoTDB/TimechoDB requirement docs, design docs, official manual topics, and issues into reviewable test-design artifacts:
+## 适用场景
 
-- It searches the official manual by default; docs URLs are optional supplements
-- It builds an atomic `test-point matrix` first, then a `test-point expansion table`
-- It turns the matrix and expansion table into detailed Markdown cases without treating a mention of the requirement sentence as coverage
-- It keeps data-path, permission, config, sync, and performance differences visible in the case design
-- `SHOW`, `DESC`, and `information_schema` are only used for metadata behavior, not for proving data-path behavior
-- It produces detailed Markdown case tables first
-- After the Markdown passes static checks, it can route scenarios to `.run`, benchmark config, or wrapper artifacts
-- If a test point is not SQL, it can route the scenario to benchmark/wrapper design instead of forcing a `.run`
-- It supports both tree and table models, with separate artifacts when `both` is requested
-- For large-data scenarios, it routes the workload to benchmark artifacts instead of massive literal `INSERT` blocks
+当你提供需求文档、设计文档、issue 或官网章节时，这个 skill 会默认：
 
-## General design constraints
+- 先拆解出尽可能完整的原子测试点
+- 再展开成测试点矩阵和测试点扩展表
+- 再生成详细的 Markdown 测试用例
+- SQL 可执行场景继续输出 `.run`
+- 大数据或性能场景改为 benchmark 配置或 wrapper 方案
+- 只做测试设计，不做远端执行、部署、清理、回收或报告生成
 
-This skill is a general IoTDB/TimechoDB SQL test-design tool, not a feature-specific template. Every new requirement should be re-analysed from the requirement, design doc, and official manual to produce executable, verifiable, and traceable test points before detailed cases are generated.
+## 触发提示词
 
-Generation rules:
-
-- One test point validates one observable rule; do not compress multiple details into one broad case
-- Every functional statement should be provable by SQL, benchmark design, wrapper, logs, or generated artifacts; merely mentioning the requirement sentence is not coverage
-- Positive paths should be paired with negative paths where meaningful; default values should be paired with explicit values; permission coverage should include granted, denied, and scope differences
-- A complex requirement should not become one test point and one case; it should first be expanded into a test-point expansion table and then into detailed cases
-- Pipe, cluster, performance, audit, and large-data content should not be casually marked as a follow-up item; if automation is impossible, state the blocking reason, trigger action, required environment, and evidence plan
-- Markdown case tables should include fields such as case name, major category, subcategory, operation data, cleanup, test result, and screenshot
-
-## Usage
-
-To force this skill explicitly:
+可直接使用下面这段话触发：
 
 ```text
-Use $iotdb-sql-testcase-pipeline.
+请根据我提供的需求文档、设计文档、issue 或官方手册，先拆解出尽可能完整的测试点，再生成详细的 Markdown 测试用例。不要概括覆盖，要尽量展开正反例、边界值、权限、配置、模型差异和联动场景；如果是 SQL 可执行场景，再补充 .run；如果涉及大数据或性能，再改为 benchmark 配置或 wrapper 方案。全程只做测试设计，不做远端执行。
 ```
 
-In normal use, just provide the requirement, design doc, or issue. Codex will search the official manual by default and output user-facing text in Simplified Chinese.
+## 使用方式
+
+- 直接给需求材料即可，skill 会自动按中文输出
+- 如果想显式触发，也可以写：`Use $iotdb-sql-testcase-pipeline`
+
+## 输出物
+
+- 详细 Markdown 用例表
+- 需要时输出 `.run`
+- 需要时输出 benchmark 配置或 wrapper
+- 覆盖自检结论、假设和阻塞项

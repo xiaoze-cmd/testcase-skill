@@ -1,7 +1,7 @@
 interface:
   display_name: "IoTDB SQL Testcase Pipeline"
-  short_description: "Generate detailed SQL cases, test-point matrices, and related artifacts"
-  default_prompt: "Use the IoTDB/TimechoDB SQL testcase pipeline: first build an atomic test-point matrix from the requirement and official manual, then create a test-point expansion table so complex points are not reduced to one case each, and finally output detailed Markdown cases and any routed artifacts such as .run, benchmark configs, or wrappers; do not perform remote execution. All user-visible explanations must be in Simplified Chinese."
+  short_description: "生成详细 SQL 用例、测试点矩阵和相关产物"
+  default_prompt: "请使用 IoTDB/TimechoDB SQL testcase pipeline：先根据需求和官方手册拆解原子测试点，再展开为测试点扩展表和详细 Markdown 用例；SQL 可执行场景再输出 .run，大数据或性能场景输出 benchmark 配置或 wrapper；只做测试设计，不做远端执行。所有用户可见说明都使用简体中文。"
 
 policy:
   allow_implicit_invocation: true
